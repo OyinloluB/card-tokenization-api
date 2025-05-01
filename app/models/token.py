@@ -1,3 +1,7 @@
+# creating token model
+# record of all generated tokens
+# used to store tokens
+
 from sqlalchemy import Column, String, DateTime, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 import uuid

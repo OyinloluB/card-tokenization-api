@@ -1,3 +1,7 @@
+# shape of the data
+# structure of the api
+# validation
+
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
@@ -12,6 +16,6 @@ class TokenRead(BaseModel):
     is_revoked: bool
     created_at: datetime
     
-    # accept orm
+    # accept sqlalchemy objects
     class Config:
         orm_mode = True

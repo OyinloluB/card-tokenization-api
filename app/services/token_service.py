@@ -2,6 +2,8 @@
 # decoding & validating tokens
 # maybe: refresh logic later
 
+from fastapi import Depends, HTTPException, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
@@ -9,6 +11,17 @@ from sqlalchemy.orm import Session
 from app.core.config import JWT_SECRET_KEY, JWT_ALGORITHM, TOKEN_EXPIRE_SECONDS
 from app.models.token import Token
 from app.schemas.token import TokenCreate
+from app.db.session import SessionLocal
+
+security = HTTPBearer
+ 
+# get db session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 def create_token(data: dict) -> str:
     """
@@ -74,3 +87,20 @@ def revoke_token_by_id(db: Session, token_id: str) -> Token:
     db.refresh(token)
 
     return token
+
+def verify_token(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+):
+    token_str = credentials.credentials
+    
+    try:
+        payload = decode_token(token_str)
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    
+    token_obj = db.query(Token).filter(Token.token == token_str).first()
+    if not token_obj or token_obj.is_revoked:
+        raise HTTPException(status_code=401, detail="Token is revoked or invalid.")
+
+    return payload

@@ -53,3 +53,24 @@ def save_token_to_db(db: Session, token_data: TokenCreate) -> Token:
     db.refresh(db_token)
     
     return db_token
+
+def get_all_tokens(db: Session) -> list[Token]:
+    return db.query(Token).all()
+
+def get_token_by_id(db: Session, token_id: str) -> Token | None:
+    return db.query(Token).filter(Token.id == token_id).first()
+
+def revoke_token_by_id(db: Session, token_id: str) -> Token:
+    token = db.query(Token).filter(Token.id == token_id).first()
+
+    if not token:
+        raise ValueError("Token not found")
+
+    if token.is_revoked:
+        raise ValueError("Token is already revoked")
+
+    token.is_revoked = True
+    db.commit()
+    db.refresh(token)
+
+    return token

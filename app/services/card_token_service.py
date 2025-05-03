@@ -102,6 +102,15 @@ def revoke_card_token_by_id(db: Session, token_id: str, user_id: str) -> CardTok
 
     return token
 
+def delete_card_token(db: Session, token_id: str, user_id: str) -> None:
+    token = db.query(CardToken).filter(CardToken.id == token_id, CardToken.user_id == user_id).first()
+    
+    if not token:
+        raise ValueError("Token not found or you do not have access to delete it.")
+
+    db.delete(token)
+    db.commit()
+
 def verify_card_token(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)

@@ -9,7 +9,8 @@ from app.services.card_token_service import (
     save_card_token_to_db,
     revoke_card_token_by_id,
     get_all_card_tokens,
-    get_card_token_by_id
+    get_card_token_by_id,
+    delete_card_token
 )
 
 security = HTTPBearer()
@@ -45,7 +46,6 @@ def issue_token(
         return db_token
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.get("/token", response_model=list[CardTokenRead])
 def list_tokens(
@@ -92,3 +92,20 @@ def revoke_token(
             status_code=400 if "already" in str(e) else 404,
             detail=str(e)
         )
+
+@router.delete("/token/{id}")
+def delete_token(
+    id: str,
+    credentials: HTTPAuthorizationCredentials = Security(security), 
+    db: Session = Depends(get_db)
+):
+    token_str = credentials.credentials
+    user_payload = decode_card_token(token_str)
+    user_id = user_payload.get("sub")
+    
+    try:
+        delete_card_token(db, id, user_id)
+        return {"message": "Token deleted successfully"}
+    except ValueError as e:
+       raise HTTPException(status_code=404, detail=str(e))
+    

@@ -1,10 +1,12 @@
 from fastapi import FastAPI
+from fastapi.security import HTTPBearer
 from contextlib import asynccontextmanager
-from app.db.session import engine
 from sqlalchemy.exc import OperationalError
 from dotenv import load_dotenv
-from app.routes import token
+
+from app.db.session import engine
 from app.models.token import Base
+from app.routes import token, auth
 
 import os
 
@@ -21,12 +23,19 @@ async def lifespan(app: FastAPI):
         print("Failed to connect to the database.")
     yield
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    title="Tokenization API",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+security_scheme = HTTPBearer()
 
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
 
 app.include_router(token.router)
+app.include_router(auth.router)
 
 Base.metadata.create_all(bind=engine)

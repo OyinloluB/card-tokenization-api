@@ -7,13 +7,19 @@ from datetime import datetime
 from typing import Optional
 
 class TokenCreate(BaseModel):
-    reference_id: str
+    card_number: str
+    cardholder_name: str
+    expiry_month: int
+    expiry_year: int
+    cvv: str
     
 class TokenRead(BaseModel):
     id: str
     token: str
-    expires_at: datetime
+    masked_card_number: str
+    cardholder_name: str
     is_revoked: bool
+    expires_at: datetime
     created_at: datetime
     
     # accept sqlalchemy objects

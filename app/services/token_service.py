@@ -22,6 +22,12 @@ def get_db():
         yield db
     finally:
         db.close()
+        
+def mask_card_number(card_number: str) -> str:
+    """
+    returns a masked card number
+    """
+    return f"{'*' * (len(card_number) - 4)}{card_number[-4:]}"
 
 def create_token(data: dict) -> str:
     """
@@ -52,13 +58,19 @@ def save_token_to_db(db: Session, token_data: TokenCreate) -> Token:
     creates and stores a new jwt token in the database
     """
     
-    payload = {"reference_id": token_data.reference_id}
+    payload = {
+        "cardholder_name": token_data.cardholder_name,
+        "expiry_month": token_data.expiry_month,
+        "expiry_year": token_data.expiry_year
+    }
+    
     jwt_str = create_token(payload)
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=TOKEN_EXPIRE_SECONDS)
     
     db_token = Token(
         token=jwt_str,
-        expires_at=expires_at
+        masked_card_number=mask_card_number(token_data.card_number),
+        expires_at=expires_at,
     )
     
     db.add(db_token)

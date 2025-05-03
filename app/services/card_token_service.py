@@ -9,8 +9,8 @@ from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 
 from app.core.config import JWT_SECRET_KEY, JWT_ALGORITHM, TOKEN_EXPIRE_SECONDS
-from app.models.token import Token
-from app.schemas.token import TokenCreate
+from app.models.card_token import CardToken
+from app.schemas.card_token import TokenCreate
 from app.db.session import SessionLocal
 
 security = HTTPBearer
@@ -29,7 +29,7 @@ def mask_card_number(card_number: str) -> str:
     """
     return f"{'*' * (len(card_number) - 4)}{card_number[-4:]}"
 
-def create_token(data: dict) -> str:
+def create_card_token(data: dict) -> str:
     """
     creates a jwt token with an expiration time.
     `data`: payload
@@ -41,7 +41,7 @@ def create_token(data: dict) -> str:
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
     return encoded_jwt
 
-def decode_token(token: str) -> dict:
+def decode_card_token(token: str) -> dict:
     """
     decodes the jwt token and returns the payload.
     raises jwterror if invalid or expired.
@@ -53,7 +53,7 @@ def decode_token(token: str) -> dict:
     except JWTError:
         raise ValueError("Invalid or expired token")
     
-def save_token_to_db(db: Session, token_data: TokenCreate) -> Token:
+def save_card_token_to_db(db: Session, token_data: TokenCreate, user_id: str) -> CardToken:
     """
     creates and stores a new jwt token in the database
     """
@@ -64,13 +64,15 @@ def save_token_to_db(db: Session, token_data: TokenCreate) -> Token:
         "expiry_year": token_data.expiry_year
     }
     
-    jwt_str = create_token(payload)
+    jwt_str = create_card_token(payload)
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=TOKEN_EXPIRE_SECONDS)
     
-    db_token = Token(
+    db_token = CardToken(
         token=jwt_str,
         masked_card_number=mask_card_number(token_data.card_number),
+        cardholder_name=token_data.cardholder_name,
         expires_at=expires_at,
+        user_id=user_id
     )
     
     db.add(db_token)
@@ -79,20 +81,20 @@ def save_token_to_db(db: Session, token_data: TokenCreate) -> Token:
     
     return db_token
 
-def get_all_tokens(db: Session) -> list[Token]:
-    return db.query(Token).all()
+def get_all_card_tokens(db: Session, user_id: str) -> list[CardToken]:
+    return db.query(CardToken).filter(CardToken.user_id == user_id).all()
 
-def get_token_by_id(db: Session, token_id: str) -> Token | None:
-    return db.query(Token).filter(Token.id == token_id).first()
+def get_card_token_by_id(db: Session, token_id: str, user_id: str) -> CardToken | None:
+    return db.query(CardToken).filter(CardToken.id == token_id, CardToken.user_id == user_id).first()
 
-def revoke_token_by_id(db: Session, token_id: str) -> Token:
-    token = db.query(Token).filter(Token.id == token_id).first()
+def revoke_card_token_by_id(db: Session, token_id: str, user_id: str) -> CardToken:
+    token = db.query(CardToken).filter(CardToken.id == token_id, CardToken.user_id == user_id).first()
 
     if not token:
-        raise ValueError("Token not found")
+        raise ValueError("Card Token not found")
 
     if token.is_revoked:
-        raise ValueError("Token is already revoked")
+        raise ValueError("Card Token is already revoked")
 
     token.is_revoked = True
     db.commit()
@@ -100,19 +102,19 @@ def revoke_token_by_id(db: Session, token_id: str) -> Token:
 
     return token
 
-def verify_token(
+def verify_card_token(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ):
     token_str = credentials.credentials
     
     try:
-        payload = decode_token(token_str)
+        payload = decode_card_token(token_str)
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
     
-    token_obj = db.query(Token).filter(Token.token == token_str).first()
+    token_obj = db.query(CardToken).filter(CardToken.token == token_str).first()
     if not token_obj or token_obj.is_revoked:
-        raise HTTPException(status_code=401, detail="Token is revoked or invalid.")
+        raise HTTPException(status_code=401, detail="Card Token is revoked or invalid.")
 
     return payload

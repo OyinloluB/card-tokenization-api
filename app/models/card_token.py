@@ -11,8 +11,8 @@ from datetime import datetime, timezone
 
 Base = declarative_base()
 
-class Token(Base):
-    __tablename__ = "tokens"
+class CardToken(Base):
+    __tablename__ = "card_tokens"
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
@@ -23,4 +23,4 @@ class Token(Base):
     is_revoked = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
-    user = relationship("User", backref="tokens")
+    user = relationship("User", backref="card_tokens")

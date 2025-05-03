@@ -5,8 +5,8 @@ from sqlalchemy.exc import OperationalError
 from dotenv import load_dotenv
 
 from app.db.session import engine
-from app.models.token import Base
-from app.routes import token, auth
+from app.models.card_token import Base
+from app.routes import card_token, auth
 
 import os
 
@@ -35,7 +35,7 @@ security_scheme = HTTPBearer()
 def health_check():
     return {"status": "ok"}
 
-app.include_router(token.router)
+app.include_router(card_token.router)
 app.include_router(auth.router)
 
 Base.metadata.create_all(bind=engine)

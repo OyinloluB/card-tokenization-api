@@ -6,14 +6,14 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 
-class TokenCreate(BaseModel):
+class CardTokenCreate(BaseModel):
     card_number: str
     cardholder_name: str
     expiry_month: int
     expiry_year: int
     cvv: str
     
-class TokenRead(BaseModel):
+class CardTokenRead(BaseModel):
     id: str
     token: str
     masked_card_number: str

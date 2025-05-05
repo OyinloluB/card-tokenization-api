@@ -2,15 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
-from app.schemas.card_token import CardTokenCreate, CardTokenRead
-from app.services.card_token_service import (
+from app.schemas.card import CardTokenCreate, CardTokenRead
+from app.services.card_service import (
     get_db,
-    decode_card_token,
-    save_card_token_to_db,
-    revoke_card_token_by_id,
-    get_all_card_tokens,
-    get_card_token_by_id,
-    delete_card_token
+    decode_card,
+    save_card_to_db,
+    revoke_card_by_id,
+    get_all_cards,
+    get_card_by_id,
+    delete_card
 )
 
 security = HTTPBearer()
@@ -22,8 +22,8 @@ def protected_route(
     credentials: HTTPAuthorizationCredentials = Security(security),
     db: Session = Depends(get_db)
 ):
-    token_str = credentials.credentials
-    payload = decode_card_token(token_str)
+    card_str = credentials.credentials
+    payload = decode_card(card_str)
     return {
         "message": "You have access!",
         "user_id": payload.get("sub"),
@@ -31,81 +31,81 @@ def protected_route(
     }
 
 
-@router.post("/token", response_model=CardTokenRead)
-def issue_token(
+@router.post("/card", response_model=CardTokenRead)
+def issue_card(
     payload: CardTokenCreate,
     credentials: HTTPAuthorizationCredentials = Security(security),
     db: Session = Depends(get_db)
 ):
-    token_str = credentials.credentials
-    user_payload = decode_card_token(token_str)
+    card_str = credentials.credentials
+    user_payload = decode_card(card_str)
     user_id = user_payload.get("sub")
     
     try:
-        db_token = save_card_token_to_db(db, payload, user_id)
-        return db_token
+        db = save_card_to_db(db, payload, user_id)
+        return db
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/token", response_model=list[CardTokenRead])
-def list_tokens(
+@router.get("/card", response_model=list[CardTokenRead])
+def list_cards(
     credentials: HTTPAuthorizationCredentials = Security(security),
     db: Session = Depends(get_db)
 ):
-    token_str = credentials.credentials
-    user_payload = decode_card_token(token_str)
+    card_str = credentials.credentials
+    user_payload = decode_card(card_str)
     user_id = user_payload.get("sub")
     
-    return get_all_card_tokens(db, user_id)
+    return get_all_cards(db, user_id)
 
-@router.get("/token/{id}", response_model=CardTokenRead)
-def get_token_by_id(
+@router.get("/card/{id}", response_model=CardTokenRead)
+def get_card_by_id(
     id: str,
     credentials: HTTPAuthorizationCredentials = Security(security),
     db: Session = Depends(get_db)
 ):
-    token_str = credentials.credentials
-    user_payload = decode_card_token(token_str)
+    card_str = credentials.credentials
+    user_payload = decode_card(card_str)
     user_id = user_payload.get("sub")
 
-    token = get_card_token_by_id(db, id, user_id)
-    if not token:
-        raise HTTPException(status_code=404, detail="Token not found")
-    return token
+    card = get_card_by_id(db, id, user_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="Card not found")
+    return card
 
 
-@router.patch("/token/{id}/revoke", response_model=CardTokenRead)
-def revoke_token(
+@router.patch("/card/{id}/revoke", response_model=CardTokenRead)
+def revoke_card(
     id: str,
     credentials: HTTPAuthorizationCredentials = Security(security),
     db: Session = Depends(get_db)
 ):
-    token_str = credentials.credentials
-    user_payload = decode_card_token(token_str)
+    card_str = credentials.credentials
+    user_payload = decode_card(card_str)
     user_id = user_payload.get("sub")
 
     try:
-        token = revoke_card_token_by_id(db, id, user_id)
-        return token
+        card = revoke_card_by_id(db, id, user_id)
+        return card
     except ValueError as e:
         raise HTTPException(
             status_code=400 if "already" in str(e) else 404,
             detail=str(e)
         )
 
-@router.delete("/token/{id}")
-def delete_token(
+@router.delete("/card/{id}")
+def delete_card(
     id: str,
     credentials: HTTPAuthorizationCredentials = Security(security), 
     db: Session = Depends(get_db)
 ):
-    token_str = credentials.credentials
-    user_payload = decode_card_token(token_str)
+    card_str = credentials.credentials
+    user_payload = decode_card(card_str)
     user_id = user_payload.get("sub")
     
     try:
-        delete_card_token(db, id, user_id)
-        return {"message": "Token deleted successfully"}
+        delete_card(db, id, user_id)
+        return {"message": "Card deleted successfully"}
     except ValueError as e:
        raise HTTPException(status_code=404, detail=str(e))
     

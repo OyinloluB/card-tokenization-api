@@ -147,14 +147,15 @@ def verify_card(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ):
-    token_str = credentials.credentials
+    jwt_token_str = credentials.credentials
     
     try:
-        payload = decode_card(token_str)
+        payload = decode_card(jwt_token_str)
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
     
-    token_obj = db.query(CardToken).filter(CardToken.card == token_str).first()
+    token_obj = db.query(CardToken).filter(CardToken.card == jwt_token_str).first()
+    
     if not token_obj or token_obj.is_revoked:
         raise HTTPException(status_code=401, detail="Card is revoked or invalid.")
 

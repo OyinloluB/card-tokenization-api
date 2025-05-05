@@ -11,33 +11,35 @@ from app.services.card_service import (
     get_all_cards,
     get_card_by_id,
     delete_card,
-    refresh_card_by_id
+    refresh_card_by_id,
+    verify_card
 )
 
 security = HTTPBearer()
 router = APIRouter()
 
-@router.get("/protected")
+@router.get("/protected", tags=["Utility"])
 def protected_route(
-    credentials: HTTPAuthorizationCredentials = Security(security),
-    db: Session = Depends(get_db)
+    user_payload: dict = Depends(verify_card),
 ):
-    jwt_token_str = credentials.credentials
-    payload = decode_card(jwt_token_str)
+    """
+    verifies that the JWT card token is valid.
+    returns basic user info extracted from the token.
+    """
+    
     return {
         "message": "You have access!",
-        "user_id": payload.get("sub"),
-        "exp": payload.get("exp")
+        "user_id": user_payload.get("sub"),
+        "exp": user_payload.get("exp"),
+        "scope": user_payload.get("scope")
     }
 
 @router.post("/card", response_model=CardTokenRead)
 def issue_card(
     payload: CardTokenCreate,
-    credentials: HTTPAuthorizationCredentials = Security(security),
+    user_payload: dict = Depends(verify_card),
     db: Session = Depends(get_db)
 ):
-    jwt_token_str = credentials.credentials
-    user_payload = decode_card(jwt_token_str)
     user_id = user_payload.get("sub")
     
     try:
@@ -48,11 +50,9 @@ def issue_card(
 
 @router.get("/card", response_model=list[CardTokenRead])
 def list_cards(
-    credentials: HTTPAuthorizationCredentials = Security(security),
+    user_payload: dict = Depends(verify_card),
     db: Session = Depends(get_db)
 ):
-    jwt_token_str = credentials.credentials
-    user_payload = decode_card(jwt_token_str)
     user_id = user_payload.get("sub")
     
     if user_payload.get("scope") not in ["read-only", "full-access", "refresh-only"]:
@@ -63,11 +63,9 @@ def list_cards(
 @router.get("/card/{id}", response_model=CardTokenRead)
 def get_card_by_id(
     id: str,
-    credentials: HTTPAuthorizationCredentials = Security(security),
+    user_payload: dict = Depends(verify_card),
     db: Session = Depends(get_db)
 ):
-    jwt_token_str = credentials.credentials
-    user_payload = decode_card(jwt_token_str)
     user_id = user_payload.get("sub")
     
     if user_payload.get("scope") not in ["read-only", "full-access", "refresh-only"]:
@@ -81,11 +79,9 @@ def get_card_by_id(
 @router.patch("/card/{id}/revoke", response_model=CardTokenRead)
 def revoke_card(
     id: str,
-    credentials: HTTPAuthorizationCredentials = Security(security),
+    user_payload: dict = Depends(verify_card),
     db: Session = Depends(get_db)
 ):
-    jwt_token_str = credentials.credentials
-    user_payload = decode_card(jwt_token_str)
     user_id = user_payload.get("sub")
     
     if user_payload.get("scope") != "full-access":
@@ -103,11 +99,9 @@ def revoke_card(
 @router.delete("/card/{id}")
 def delete_card(
     id: str,
-    credentials: HTTPAuthorizationCredentials = Security(security), 
+    user_payload: dict = Depends(verify_card), 
     db: Session = Depends(get_db)
 ):
-    jwt_token_str = credentials.credentials
-    user_payload = decode_card(jwt_token_str)
     user_id = user_payload.get("sub")
     
     if user_payload.get("scope") != "full-access":
@@ -122,11 +116,9 @@ def delete_card(
 @router.post("/card/{id}/refresh", response_model=CardTokenRead)
 def refresh_token(
     id: str,
-    credentials: HTTPAuthorizationCredentials = Security(security),
+    user_payload: dict = Depends(verify_card),
     db: Session = Depends(get_db)
 ):
-    jwt_token_str = credentials.credentials
-    user_payload = decode_card(jwt_token_str)
     user_id = user_payload.get("sub")
     
     if user_payload.get("scope") not in ["refresh-only", "full-access"]:

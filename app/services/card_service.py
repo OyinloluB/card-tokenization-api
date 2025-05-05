@@ -24,17 +24,9 @@ def get_db():
         db.close()
         
 def mask_card_number(card_number: str) -> str:
-    """
-    returns a masked card number
-    """
     return f"{'*' * (len(card_number) - 4)}{card_number[-4:]}"
 
-def create_card(data: dict) -> str:
-    """
-    creates a jwt card with an expiration time.
-    `data`: payload
-    """
-    
+def create_card(data: dict) -> str: 
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(seconds=TOKEN_EXPIRE_SECONDS)
     to_encode.update({"exp": expire})
@@ -42,11 +34,6 @@ def create_card(data: dict) -> str:
     return encoded_jwt
 
 def decode_card(card: str) -> dict:
-    """
-    decodes the jwt card and returns the payload.
-    raises jwterror if invalid or expired.
-    """
-    
     try:
         payload = jwt.decode(card, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
         return payload
@@ -54,32 +41,30 @@ def decode_card(card: str) -> dict:
         raise ValueError("Invalid or expired card")
     
 def save_card_to_db(db: Session, card_data: CardTokenCreate, user_id: str) -> CardToken:
-    """
-    creates and stores a new jwt card in the database
-    """
-    
     payload = {
         "cardholder_name": card_data.cardholder_name,
         "expiry_month": card_data.expiry_month,
-        "expiry_year": card_data.expiry_year
+        "expiry_year": card_data.expiry_year,
+        "scope": card_data.scope.value
     }
     
     jwt_str = create_card(payload)
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=TOKEN_EXPIRE_SECONDS)
     
-    db_token = CardToken(
+    db_card = CardToken(
         card=jwt_str,
         masked_card_number=mask_card_number(card_data.card_number),
         cardholder_name=card_data.cardholder_name,
         expires_at=expires_at,
-        user_id=user_id
+        user_id=user_id,
+        scope=card_data.scope.value
     )
     
-    db.add(db_token)
+    db.add(db_card)
     db.commit()
-    db.refresh(db_token)
+    db.refresh(db_card)
     
-    return db_token
+    return db_card
 
 def get_all_cards(db: Session, user_id: str) -> list[CardToken]:
     now = datetime.now(timezone.utc)
@@ -99,7 +84,7 @@ def get_card_by_id(db: Session, card_id: str, user_id: str) -> CardToken | None:
         return None
     
     now = datetime.now(timezone.utc)
-    if card.expires_at > now:
+    if card.expires_at < now:
         return None
     
     return card
@@ -140,14 +125,14 @@ def refresh_card_by_id(db: Session, card_id: str, user_id: str) -> CardToken:
     if card.expires_at < datetime.now(timezone.utc):
         raise ValueError("Card has expired")
     
-    payload = decode_card(card.token)
+    payload = decode_card(card.jwt_token)
     
     new_card_token = create_card(payload)
     new_expires_at = datetime.now(timezone.utc) + timedelta(seconds=TOKEN_EXPIRE_SECONDS)
     
     new_token = CardToken(
         user_id=card.user_id,
-        token=new_card_token,
+        jwt_token=new_card_token,
         mask_card_number=card.masked_card_number,
         cardholder_name=card.cardholder_name,
         expires_at=new_expires_at

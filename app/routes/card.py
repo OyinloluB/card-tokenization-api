@@ -17,14 +17,13 @@ from app.services.card_service import (
 security = HTTPBearer()
 router = APIRouter()
 
-
 @router.get("/protected")
 def protected_route(
     credentials: HTTPAuthorizationCredentials = Security(security),
     db: Session = Depends(get_db)
 ):
-    card_str = credentials.credentials
-    payload = decode_card(card_str)
+    jwt_token_str = credentials.credentials
+    payload = decode_card(jwt_token_str)
     return {
         "message": "You have access!",
         "user_id": payload.get("sub"),
@@ -37,8 +36,8 @@ def issue_card(
     credentials: HTTPAuthorizationCredentials = Security(security),
     db: Session = Depends(get_db)
 ):
-    card_str = credentials.credentials
-    user_payload = decode_card(card_str)
+    jwt_token_str = credentials.credentials
+    user_payload = decode_card(jwt_token_str)
     user_id = user_payload.get("sub")
     
     try:
@@ -52,9 +51,12 @@ def list_cards(
     credentials: HTTPAuthorizationCredentials = Security(security),
     db: Session = Depends(get_db)
 ):
-    card_str = credentials.credentials
-    user_payload = decode_card(card_str)
+    jwt_token_str = credentials.credentials
+    user_payload = decode_card(jwt_token_str)
     user_id = user_payload.get("sub")
+    
+    if user_payload.get("scope") not in ["read-only", "full-access", "refresh-only"]:
+        raise HTTPException(status_code=403, detail="You don't have read permissions")
     
     return get_all_cards(db, user_id)
 
@@ -64,9 +66,12 @@ def get_card_by_id(
     credentials: HTTPAuthorizationCredentials = Security(security),
     db: Session = Depends(get_db)
 ):
-    card_str = credentials.credentials
-    user_payload = decode_card(card_str)
+    jwt_token_str = credentials.credentials
+    user_payload = decode_card(jwt_token_str)
     user_id = user_payload.get("sub")
+    
+    if user_payload.get("scope") not in ["read-only", "full-access", "refresh-only"]:
+        raise HTTPException(status_code=403, detail="You don't have read permissions")
 
     card = get_card_by_id(db, id, user_id)
     if not card:
@@ -79,9 +84,12 @@ def revoke_card(
     credentials: HTTPAuthorizationCredentials = Security(security),
     db: Session = Depends(get_db)
 ):
-    card_str = credentials.credentials
-    user_payload = decode_card(card_str)
+    jwt_token_str = credentials.credentials
+    user_payload = decode_card(jwt_token_str)
     user_id = user_payload.get("sub")
+    
+    if user_payload.get("scope") != "full-access":
+        raise HTTPException(status_code=403, detail="You don't have revoke permissions")
 
     try:
         card = revoke_card_by_id(db, id, user_id)
@@ -98,9 +106,12 @@ def delete_card(
     credentials: HTTPAuthorizationCredentials = Security(security), 
     db: Session = Depends(get_db)
 ):
-    card_str = credentials.credentials
-    user_payload = decode_card(card_str)
+    jwt_token_str = credentials.credentials
+    user_payload = decode_card(jwt_token_str)
     user_id = user_payload.get("sub")
+    
+    if user_payload.get("scope") != "full-access":
+        raise HTTPException(status_code=403, detail="You don't have delete permissions")
     
     try:
         delete_card(db, id, user_id)
@@ -108,16 +119,19 @@ def delete_card(
     except ValueError as e:
        raise HTTPException(status_code=404, detail=str(e))
     
-@router.post("/token{id}/refresh", response_model=CardTokenRead)
+@router.post("/card/{id}/refresh", response_model=CardTokenRead)
 def refresh_token(
     id: str,
     credentials: HTTPAuthorizationCredentials = Security(security),
     db: Session = Depends(get_db)
 ):
-    card_str = credentials.credentials
-    user_payload = decode_card(card_str)
+    jwt_token_str = credentials.credentials
+    user_payload = decode_card(jwt_token_str)
     user_id = user_payload.get("sub")
     
+    if user_payload.get("scope") not in ["refresh-only", "full-access"]:
+        raise HTTPException(status_code=403, detail="You don't have refresh permissions")
+
     try:
         new_card = refresh_card_by_id(db, id, user_id)
         return new_card

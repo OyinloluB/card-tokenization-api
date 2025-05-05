@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI):
         with engine.connect() as conn:
             print("Connected to the database successfully.")
             
-            # clean expired card tokens
+            # clean expired card jwt tokens
             from app.models.card import CardToken
             from sqlalchemy.orm import Session
             from datetime import datetime, timezone
@@ -29,13 +29,13 @@ async def lifespan(app: FastAPI):
             deleted = session.query(CardToken).filter(CardToken.expires_at < now).delete()
             session.commit()
             
-            print(f"Deleted {deleted} expired virtual card token(s).")
+            print(f"Deleted {deleted} expired virtual card(s).")
     except OperationalError:
         print("Failed to connect to the database.")
     yield
 
 app = FastAPI(
-    title="Tokenization API",
+    title="Card Tokenization API",
     version="1.0.0",
     lifespan=lifespan
 )

@@ -10,11 +10,9 @@ router = APIRouter()
 
 @router.post("/signup")
 def signup(user: UserCreate, db: Session = Depends(get_db)):
-    # check if user already exists
-    existing_user = db.query(User).filter(User.username == user.username).first()
-    
+    existing_user = get_user_by_email(db, user.email)
     if existing_user:
-        raise HTTPException(status_code=400, detail="Username already taken")
+        raise HTTPException(status_code=400, detail="Email already registered")
     
     create_user(db, user)
     return {"message": "User created successfully"}
@@ -22,11 +20,8 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
 @router.post("/login")
 def login(user: UserLogin, db: Session = Depends(get_db)):
     db_user = get_user_by_email(db, user.email)
-    if not db_user:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    
-    if not verify_password(user.password, db_user.hashed_password):
+    if not db_user or not verify_password(user.password, db_user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    token = create_access_token({"user_id": str(db_user.id)})
+    token = create_access_token({"sub": str(db_user.id)})
     return {"access_token": token, "token_type": "bearer"}

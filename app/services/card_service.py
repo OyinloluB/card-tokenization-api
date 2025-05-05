@@ -82,10 +82,27 @@ def save_card_to_db(db: Session, card_data: CardTokenCreate, user_id: str) -> Ca
     return db_token
 
 def get_all_cards(db: Session, user_id: str) -> list[CardToken]:
-    return db.query(CardToken).filter(CardToken.user_id == user_id).all()
+    now = datetime.now(timezone.utc)
+    return db.query(CardToken).filter(
+        CardToken.user_id == user_id,
+        CardToken.expires_at > now,
+        CardToken.is_revoked == False
+    ).all()
 
 def get_card_by_id(db: Session, card_id: str, user_id: str) -> CardToken | None:
-    return db.query(CardToken).filter(CardToken.id == card_id, CardToken.user_id == user_id).first()
+    card = db.query(CardToken).filter(
+        CardToken.id == card_id,
+        CardToken.user_id == user_id
+    ).first()
+    
+    if not card:
+        return None
+    
+    now = datetime.now(timezone.utc)
+    if card.expires_at > now:
+        return None
+    
+    return card
 
 def revoke_card_by_id(db: Session, card_id: str, user_id: str) -> CardToken:
     card = db.query(CardToken).filter(CardToken.id == card_id, CardToken.user_id == user_id).first()
@@ -110,6 +127,36 @@ def delete_card(db: Session, card_id: str, user_id: str) -> None:
 
     db.delete(card)
     db.commit()
+
+def refresh_card_by_id(db: Session, card_id: str, user_id: str) -> CardToken:
+    card = db.query(CardToken).filter(CardToken.id == card_id, CardToken.user_id == user_id).first()
+    
+    if not card:
+        raise ValueError("Card not found")
+    
+    if card.is_revoked:
+        raise ValueError("Card is revoked")
+    
+    if card.expires_at < datetime.now(timezone.utc):
+        raise ValueError("Card has expired")
+    
+    payload = decode_card(card.token)
+    
+    new_card_token = create_card(payload)
+    new_expires_at = datetime.now(timezone.utc) + timedelta(seconds=TOKEN_EXPIRE_SECONDS)
+    
+    new_token = CardToken(
+        user_id=card.user_id,
+        token=new_card_token,
+        mask_card_number=card.masked_card_number,
+        cardholder_name=card.cardholder_name,
+        expires_at=new_expires_at
+    )
+    
+    db.add(new_token)
+    db.commit()
+    db.refresh(new_token)
+    return new_token
 
 def verify_card(
     credentials: HTTPAuthorizationCredentials = Depends(security),

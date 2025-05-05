@@ -10,7 +10,8 @@ from app.services.card_service import (
     revoke_card_by_id,
     get_all_cards,
     get_card_by_id,
-    delete_card
+    delete_card,
+    refresh_card_by_id
 )
 
 security = HTTPBearer()
@@ -29,7 +30,6 @@ def protected_route(
         "user_id": payload.get("sub"),
         "exp": payload.get("exp")
     }
-
 
 @router.post("/card", response_model=CardTokenRead)
 def issue_card(
@@ -73,7 +73,6 @@ def get_card_by_id(
         raise HTTPException(status_code=404, detail="Card not found")
     return card
 
-
 @router.patch("/card/{id}/revoke", response_model=CardTokenRead)
 def revoke_card(
     id: str,
@@ -109,3 +108,18 @@ def delete_card(
     except ValueError as e:
        raise HTTPException(status_code=404, detail=str(e))
     
+@router.post("/token{id}/refresh", response_model=CardTokenRead)
+def refresh_token(
+    id: str,
+    credentials: HTTPAuthorizationCredentials = Security(security),
+    db: Session = Depends(get_db)
+):
+    card_str = credentials.credentials
+    user_payload = decode_card(card_str)
+    user_id = user_payload.get("sub")
+    
+    try:
+        new_card = refresh_card_by_id(db, id, user_id)
+        return new_card
+    except ValueError as e:
+        raise HTTPAuthorizationCredentials(status_code=400 if "already" in str(e) or "expired" in str(e) else 404, detail=str(e))

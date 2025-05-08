@@ -3,14 +3,12 @@
 # used to store tokens
 
 from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
 from datetime import datetime, timezone
 
-Base = declarative_base()
-
+from app.db.session import Base
 class CardToken(Base):
     __tablename__ = "card_tokens"
     

@@ -13,7 +13,7 @@ from app.models.card import CardToken
 from app.schemas.card import CardTokenCreate
 from app.db.session import SessionLocal
 
-security = HTTPBearer
+security = HTTPBearer()
  
 # get db session
 def get_db():
@@ -52,7 +52,7 @@ def save_card_to_db(db: Session, card_data: CardTokenCreate, user_id: str) -> Ca
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=TOKEN_EXPIRE_SECONDS)
     
     db_card = CardToken(
-        card=jwt_str,
+        jwt_token=jwt_str,
         masked_card_number=mask_card_number(card_data.card_number),
         cardholder_name=card_data.cardholder_name,
         expires_at=expires_at,
@@ -154,7 +154,7 @@ def verify_card(
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
     
-    token_obj = db.query(CardToken).filter(CardToken.card == jwt_token_str).first()
+    token_obj = db.query(CardToken).filter(CardToken.jwt_token == jwt_token_str).first()
     
     if not token_obj or token_obj.is_revoked:
         raise HTTPException(status_code=401, detail="Card is revoked or invalid.")

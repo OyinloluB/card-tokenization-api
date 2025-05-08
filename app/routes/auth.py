@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.schemas.user import UserCreate, UserLogin
 from app.models.user import User
-from app.db.session import get_db
+from app.services.card_service import get_db
 from app.services.auth_service import create_user, get_user_by_email, verify_password, create_access_token
 
 router = APIRouter()

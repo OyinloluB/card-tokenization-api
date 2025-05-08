@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.security import HTTPBearer
+from fastapi.openapi.utils import get_openapi
 from contextlib import asynccontextmanager
 from sqlalchemy.exc import OperationalError
 from dotenv import load_dotenv
@@ -41,6 +42,30 @@ app = FastAPI(
 )
 
 security_scheme = HTTPBearer()
+
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title="Card Tokenization API",
+        version="1.0.0",
+        description="API for tokenizing and managing virtual card credentials.",
+        routes=app.routes,
+    )
+    openapi_schema["components"]["securitySchemes"] = {
+        "HTTPBearer": {
+            "type": "http",
+            "scheme": "bearer"
+        }
+    }
+    openapi_schema["security"] = [{"HTTPBearer": []}]
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
+
 
 @app.get("/health")
 def health_check():

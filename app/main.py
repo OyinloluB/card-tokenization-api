@@ -17,7 +17,7 @@ load_dotenv()
 async def lifespan(app: FastAPI):
     try:
         with engine.connect() as conn:
-            print("Connected to the database successfully.")
+            print("Connected to the database successfully!")
             
             # clean expired card jwt tokens
             from app.models.card import CardToken

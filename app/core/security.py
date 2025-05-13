@@ -3,6 +3,8 @@ security utilities for the application.
 handles token creation, validation, and password operations.
 """
 
+import re
+
 from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
@@ -22,6 +24,19 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """verify a password against its hash."""
     return pwd_context.verify(plain_password, hashed_password)
+
+def validate_password_strength(password: str) -> bool:
+    if len(password) < 8:
+        raise ValueError("Password must be at least 8 characters long")
+    
+    if not re.search(r'[A-Z]', password):
+        raise ValueError("Password must contain at least one uppercase letter")
+    if not re.search(r'[a-z]', password):
+        raise ValueError("Password must contain at least one lowercase letter")
+    if not re.search(r'[0-9]', password):
+        raise ValueError("Password must contain at least one digit")
+    
+    return True
 
 def create_token(data: Dict[str, Any]) -> str:
     """

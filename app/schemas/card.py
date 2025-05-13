@@ -14,7 +14,7 @@ class CardTokenBase(BaseModel):
     cardholder_name: str = Field(..., min_length=2, max_length=100)
     scope: CardScope = Field(default=CardScope.FULL_ACCESS)
 
-class CardTokenCreate(BaseModel):
+class CardTokenCreate(CardTokenBase):
     card_number: str = Field(..., min_length=13, max_length=19, pattern=r'^\d+$')
     expiry_month: int = Field(..., ge=1, le=12)
     expiry_year: int = Field(..., ge=2000)
@@ -74,8 +74,3 @@ class CardTokenRead(BaseModel):
 class CardTokenUpdate(BaseModel):
     """schema for updating a card token."""
     scope: Optional[CardScope] = None
-
-class TokenResponse(BaseModel):
-    """generic response for token operations."""
-    message: str
-    token_id: Optional[str] = None

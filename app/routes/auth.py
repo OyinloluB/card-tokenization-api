@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
-from app.core.security import verify_password
+from app.core.security import verify_password, create_token, validate_password_strength
 from app.schemas.user import UserCreate, UserLogin, MessageResponse, TokenResponse
-from app.services.card_service import get_db
-from app.services.auth_service import create_user, get_user_by_email, create_access_token, validate_password_strength
+from app.services.utils import get_db
+from app.services.auth_service import create_user, get_user_by_email
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -79,5 +79,5 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
         "email": db_user.email
     }
     
-    token = create_access_token(token_data)
+    token = create_token(token_data)
     return {"access_token": token, "token_type": "bearer", "user_id": str(db_user.id)}

@@ -19,32 +19,8 @@ def mask_card_number(card_number: str) -> str:
         raise ValueError("Invalid card number format")
 
     return f"{'*' * (len(card_number) - 4)}{card_number[-4:]}"
-     
-def validate_card_data(card_data: CardTokenCreate) -> None:
-    if not card_data.card_number.isdigit() or len(card_data.card_number) < 13 or len(card_data.card_number) > 19:
-        raise ValueError("Invalid card number format")
-    
-    # validate expiry date
-    current_year = datetime.now().year
-    current_month = datetime.now().month
-    
-    if not (1 <= card_data.expiry_month <= 12):
-        raise ValueError("Invalid expiry month")
-        
-    if card_data.expiry_year < current_year or (card_data.expiry_year == current_year and card_data.expiry_month < current_month):
-        raise ValueError("Card has expired")
-        
-    # validate CVV
-    if not card_data.cvv.isdigit() or not (3 <= len(card_data.cvv) <= 4):
-        raise ValueError("Invalid CVV format")
-        
-    # validate cardholder name
-    if not card_data.cardholder_name or len(card_data.cardholder_name) < 2:
-        raise ValueError("Invalid cardholder name")
 
-def save_card_to_db(db: Session, card_data: CardTokenCreate, user_id: str) -> CardToken:
-    validate_card_data(card_data)
-    
+def save_card_to_db(db: Session, card_data: CardTokenCreate, user_id: str) -> CardToken:    
     payload = {
         "cardholder_name": card_data.cardholder_name,
         "expiry_month": card_data.expiry_month,
@@ -142,8 +118,6 @@ def verify_card(
 ):
     jwt_token_str = credentials.credentials
     payload = decode_token(jwt_token_str)
-    
-    print(f"The value is: {payload}")
     
     token_obj = db.query(CardToken).filter(CardToken.jwt_token == jwt_token_str).first()
     if not token_obj or token_obj.is_revoked:

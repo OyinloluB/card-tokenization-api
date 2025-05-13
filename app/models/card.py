@@ -27,6 +27,6 @@ class CardToken(Base):
         Index('idx_card_tokens_active', 'is_revoked', 'expires_at'),
     )
     
-def __repr__(self):
+    def __repr__(self):
         """String representation of the CardToken."""
         return f"<CardToken(id={self.id}, user_id={self.user_id}, expires_at={self.expires_at})>"

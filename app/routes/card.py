@@ -5,7 +5,6 @@ from typing import List
 
 from app.schemas.card import CardTokenCreate, CardTokenRead
 from app.services.card_service import (
-    get_db,
     save_card_to_db,
     revoke_card_by_id,
     get_all_cards,
@@ -15,6 +14,7 @@ from app.services.card_service import (
     verify_card,
 )
 from app.services.auth_service import verify_user
+from app.services.utils import get_db
 
 security = HTTPBearer()
 router = APIRouter(prefix="/cards", tags=["Cards"])

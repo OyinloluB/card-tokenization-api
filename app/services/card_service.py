@@ -3,57 +3,23 @@ import logging
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import datetime, timedelta, timezone
-from jose import jwt, JWTError
 from sqlalchemy.orm import Session
-from typing import Dict, List, Optional, Union, Any
 
-from app.core.config import JWT_SECRET_KEY, JWT_ALGORITHM, TOKEN_EXPIRE_SECONDS
-from app.models.user import User
+from app.core.config import TOKEN_EXPIRE_SECONDS
+from app.core.security import create_token, decode_token
 from app.models.card import CardToken
 from app.schemas.card import CardTokenCreate
-from app.db.session import SessionLocal
+from app.services.utils import get_db
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer()
- 
-# get db session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
         
 def mask_card_number(card_number: str) -> str:
     if not card_number.isdigit() or len(card_number) < 13 or len(card_number) > 19:
         raise ValueError("Invalid card number format")
 
     return f"{'*' * (len(card_number) - 4)}{card_number[-4:]}"
-
-def create_card(data: Dict[str, Any]) -> str:
-    to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(seconds=TOKEN_EXPIRE_SECONDS)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
-    return encoded_jwt
-
-def decode_card_tokens(card: str) -> Dict[str, Any]:
-    try:
-        payload = jwt.decode(card, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
-        return payload
-    except JWTError as e:
-        logger.warning(f"Invalid card token: {str(e)}")
-        raise ValueError("Invalid or expired token")
-    
-def decode_user_tokens(user: str) -> Dict[str, Any]:
-    try:
-        payload = jwt.decode(user, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
-        logger.debug(f"Decoded user token payload: {payload}")
-        return payload
-    except JWTError as e:
-        logger.warning(f"Invalid user token: {str(e)}")
-        raise ValueError("Invalid or expired user token")
-    
+     
 def validate_card_data(card_data: CardTokenCreate) -> None:
     if not card_data.card_number.isdigit() or len(card_data.card_number) < 13 or len(card_data.card_number) > 19:
         raise ValueError("Invalid card number format")
@@ -86,7 +52,7 @@ def save_card_to_db(db: Session, card_data: CardTokenCreate, user_id: str) -> Ca
         "scope": card_data.scope.value
     }
     
-    jwt_str = create_card(payload)
+    jwt_str = create_token(payload)
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=TOKEN_EXPIRE_SECONDS)
     
     db_card = CardToken(
@@ -160,9 +126,9 @@ def refresh_card_by_id(db: Session, card_id: str, jwt_token: str) -> CardToken:
     if card.expires_at < datetime.now(timezone.utc):
         raise ValueError("Card has expired")
     
-    payload = decode_card_tokens(card.jwt_token)
+    payload = decode_token(card.jwt_token)
     
-    card.jwt_token = create_card(payload)
+    card.jwt_token = create_token(payload)
     card.expires_at = datetime.now(timezone.utc) + timedelta(seconds=TOKEN_EXPIRE_SECONDS)
     
     db.commit()
@@ -175,7 +141,7 @@ def verify_card(
     db: Session = Depends(get_db)
 ):
     jwt_token_str = credentials.credentials
-    payload = decode_card_tokens(jwt_token_str)
+    payload = decode_token(jwt_token_str)
     
     print(f"The value is: {payload}")
     
@@ -187,20 +153,3 @@ def verify_card(
         "payload": payload,
         "sub": str(token_obj.user_id)
     }
-
-def verify_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
-):
-    jwt_token_str = credentials.credentials
-    payload = decode_user_tokens(jwt_token_str)
-
-    user_id = payload.get("sub")
-    if not user_id:
-        raise HTTPException(status_code=400, detail="User ID missing in token")
-
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    return payload

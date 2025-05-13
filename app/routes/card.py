@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from typing import Callable, Dict, List
+from typing import List
 
 from app.schemas.card import CardTokenCreate, CardTokenRead
 from app.services.card_service import (
@@ -13,8 +13,8 @@ from app.services.card_service import (
     delete_card,
     refresh_card_by_id,
     verify_card,
-    verify_user
 )
+from app.services.auth_service import verify_user
 
 security = HTTPBearer()
 router = APIRouter(prefix="/cards", tags=["Cards"])
@@ -86,6 +86,12 @@ def revoke_card(
    db: Session = Depends(get_db)
 ):
     jwt_token = credentials.credentials
+    user_id = card_info["sub"]
+    
+    card = get_card_by_id(db, id, user_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="Card not found")
+    
     
     try:
         return revoke_card_by_id(db, id, jwt_token)
@@ -103,6 +109,11 @@ def delete_token(
     db: Session = Depends(get_db)
 ):
     jwt_token = credentials.credentials
+    user_id = card_info["sub"]
+    
+    card = get_card_by_id(db, id, user_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="Card not found")
     
     try:
         delete_card(db, id, jwt_token)
@@ -118,6 +129,11 @@ def refresh_token(
     db: Session = Depends(get_db)
 ):
     jwt_token = credentials.credentials
+    user_id = card_info["sub"]
+    
+    card = get_card_by_id(db, id, user_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="Card not found")
     
     try:
         return refresh_card_by_id(db, id, jwt_token)

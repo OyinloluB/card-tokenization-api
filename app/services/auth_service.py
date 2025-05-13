@@ -1,24 +1,24 @@
+import re
+import uuid
+import logging
+
 from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 from jose import jwt
 from sqlalchemy.orm import Session
-from fastapi import HTTPException
+from fastapi import HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.exc import SQLAlchemyError
-from typing import Dict, Optional, Any
-import re
-import uuid
 
 from app.models.user import User
 from app.schemas.user import UserCreate
 from app.core.config import JWT_SECRET_KEY, JWT_ALGORITHM, TOKEN_EXPIRE_SECONDS
+from app.core.security import hash_password, decode_token
+from app.services.utils import get_db
 
+logger = logging.getLogger(__name__)
+security = HTTPBearer()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
 
 def validate_password_strength(password: str) -> bool:
     if len(password) < 8:
@@ -69,3 +69,20 @@ def create_user(db: Session, user_data: UserCreate) -> User:
         db.rollback()
         
         raise HTTPException(status_code=500, detail="Database error occurred")
+    
+def verify_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+):
+    jwt_token_str = credentials.credentials
+    payload = decode_token(jwt_token_str)
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID missing in token")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return payload

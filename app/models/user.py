@@ -21,14 +21,6 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    
-class MessageResponse(BaseModel):
-    message: str
-    user_id: Optional[str] = None
-    
 def __repr__(self):
-    """String representation of the User."""
+    """string representation of the User."""
     return f"<User(id={self.id}, email={self.email})>"

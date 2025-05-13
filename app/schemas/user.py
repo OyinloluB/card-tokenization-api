@@ -1,19 +1,10 @@
-"""
-Pydantic schemas for user management and authentication.
-
-These models define the structure of requests and responses for user-related operations,
-as well as validation rules for user data.
-"""
-
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from datetime import datetime
 from typing import Optional
 import re
 
-
 class UserBase(BaseModel):
     email: EmailStr
-
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8)
@@ -30,7 +21,6 @@ class UserCreate(UserBase):
             raise ValueError("Password must contain at least one digit")
         return v
 
-
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
@@ -42,7 +32,12 @@ class UserRead(UserBase):
     model_config = {
         "from_attributes": True
     }
-class AuthResponse(BaseModel):
+class TokenResponse(BaseModel):
+    """response schema for token operations."""
     access_token: str
     token_type: str = "bearer"
-    user_id: str
+    user_id: Optional[str] = None
+    
+class MessageResponse(BaseModel):
+    message: str
+    user_id: Optional[str] = None

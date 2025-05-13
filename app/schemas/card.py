@@ -24,7 +24,7 @@ class CardTokenCreate(BaseModel):
     @classmethod
     def validate_card_number(cls, v):
         """validate card number using Luhn algorithm."""
-        # Remove any spaces or dashes
+        # remove any spaces or dashes
         v = re.sub(r'[\s-]', '', v)
         
         if not v.isdigit():
@@ -35,11 +35,11 @@ class CardTokenCreate(BaseModel):
         checksum = digits.pop()
         digits.reverse()
         
-        # Double odd-indexed digits
+        # double odd-indexed digits
         digits = [d * 2 if i % 2 else d for i, d in enumerate(digits)]
-        # Subtract 9 from numbers > 9
+        # subtract 9 from numbers > 9
         digits = [d - 9 if d > 9 else d for d in digits]
-        # Check if sum + checksum is divisible by 10
+        # check if sum + checksum is divisible by 10
         if (sum(digits) + checksum) % 10 != 0:
             raise ValueError("Invalid card number")
             

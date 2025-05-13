@@ -1,10 +1,6 @@
-"""
-security utilities for the application.
-handles token creation, validation, and password operations.
-"""
-
 import re
 
+from fastapi.security import HTTPBearer
 from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
@@ -16,6 +12,7 @@ from app.core.config import JWT_SECRET_KEY, JWT_ALGORITHM, TOKEN_EXPIRE_SECONDS
 
 logger = logging.getLogger(__name__)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+security = HTTPBearer()
 
 def hash_password(password: str) -> str:
     """hash a password using bcrypt."""
@@ -26,15 +23,28 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 def validate_password_strength(password: str) -> bool:
+    """
+    validate password strength using basic rules.
+    
+    args:
+        password: password to validate
+        
+    returns:
+        True if password meets requirements
+        
+    raises:
+        ValueError: if password is too weak
+    """
+    
     if len(password) < 8:
-        raise ValueError("Password must be at least 8 characters long")
+        raise ValueError("password must be at least 8 characters long")
     
     if not re.search(r'[A-Z]', password):
-        raise ValueError("Password must contain at least one uppercase letter")
+        raise ValueError("password must contain at least one uppercase letter")
     if not re.search(r'[a-z]', password):
-        raise ValueError("Password must contain at least one lowercase letter")
+        raise ValueError("password must contain at least one lowercase letter")
     if not re.search(r'[0-9]', password):
-        raise ValueError("Password must contain at least one digit")
+        raise ValueError("password must contain at least one digit")
     
     return True
 

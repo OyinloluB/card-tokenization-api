@@ -3,7 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import List
 
-from app.schemas.card import CardTokenCreate, CardTokenRead
+from app.schemas.card import CardTokenCreate, CardTokenRead, CardDeleteResponse
 from app.services.card_service import (
     save_card_to_db,
     revoke_card_by_id,
@@ -20,12 +20,14 @@ security = HTTPBearer()
 router = APIRouter(prefix="/cards", tags=["Cards"])
 
 def require_scope(allowed_scopes: List[str]):
+    """create a dependency that checks if the card token has the required scope."""
+    
     def scope_checker(card_info: dict = Depends(verify_card)):
         payload = card_info["payload"]
         if payload.get("scope") not in allowed_scopes:
             raise HTTPException(
                 status_code=403, 
-                detail=f"Insufficient permissions. Required scopes: {', '.join(allowed_scopes)}"
+                detail=f"insufficient permissions. Required scopes: {', '.join(allowed_scopes)}"
             )
         return card_info
     return scope_checker
@@ -34,6 +36,8 @@ def require_scope(allowed_scopes: List[str]):
 def protected_route(
     user_payload: dict = Depends(verify_card),
 ):
+    """test endpoint to verify card token authentication."""
+    
     return {
         "message": "You have access!",
         "user_id": user_payload.get("sub"),
@@ -47,6 +51,8 @@ def issue_card(
     user_payload: dict = Depends(verify_user),
     db: Session = Depends(get_db)
 ):
+    """create a new card."""
+    
     user_id = user_payload.get("sub")
     
     try:
@@ -55,13 +61,15 @@ def issue_card(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+        raise HTTPException(status_code=500, detail="an unexpected error occurred")
 
 @router.get("", response_model=List[CardTokenRead])
 def list_cards(
     user_payload: dict = Depends(verify_user),
     db: Session = Depends(get_db)
 ):
+    """list all active card tokens for the authenticated user."""
+    
     user_id = user_payload.get("sub")
     return get_all_cards(db, user_id)
 
@@ -71,11 +79,14 @@ def list_card_by_id(
     card_info: dict = Depends(require_scope(["read-only", "full-access", "refresh-only"])),
     db: Session = Depends(get_db)
 ):
+    """get a specific card token by id."""
+    
     user_id = card_info["sub"]
     
     card = get_card_by_id(db, id, user_id)
+    
     if not card:
-        raise HTTPException(status_code=404, detail="Card not found")
+        raise HTTPException(status_code=404, detail="card not found")
     return card
 
 @router.patch("/{id}/revoke", response_model=CardTokenRead)
@@ -85,12 +96,14 @@ def revoke_card(
    credentials: HTTPAuthorizationCredentials = Security(security),
    db: Session = Depends(get_db)
 ):
+    """revoke a card token."""
+    
     jwt_token = credentials.credentials
     user_id = card_info["sub"]
     
     card = get_card_by_id(db, id, user_id)
     if not card:
-        raise HTTPException(status_code=404, detail="Card not found")
+        raise HTTPException(status_code=404, detail="card not found")
     
     
     try:
@@ -101,23 +114,25 @@ def revoke_card(
         else:
             raise HTTPException(status_code=404, detail=str(e))
 
-@router.delete("/{id}", response_model=dict)
+@router.delete("/{id}", response_model=CardDeleteResponse)
 def delete_token(
     id: str,
     card_info: dict = Depends(require_scope(["full-access"])),
     credentials: HTTPAuthorizationCredentials = Security(security),
     db: Session = Depends(get_db)
 ):
+    """delete a card token."""
+    
     jwt_token = credentials.credentials
     user_id = card_info["sub"]
     
     card = get_card_by_id(db, id, user_id)
     if not card:
-        raise HTTPException(status_code=404, detail="Card not found")
+        raise HTTPException(status_code=404, detail="card not found")
     
     try:
         delete_card(db, id, jwt_token)
-        return {"message": "Card deleted successfully"}
+        return {"message": "card deleted successfully"}
     except ValueError as e:
        raise HTTPException(status_code=404, detail=str(e))
     
@@ -128,12 +143,14 @@ def refresh_token(
     credentials: HTTPAuthorizationCredentials = Security(security),
     db: Session = Depends(get_db)
 ):
+    """refresh a card token's expiration time."""
+    
     jwt_token = credentials.credentials
     user_id = card_info["sub"]
     
     card = get_card_by_id(db, id, user_id)
     if not card:
-        raise HTTPException(status_code=404, detail="Card not found")
+        raise HTTPException(status_code=404, detail="card not found")
     
     try:
         return refresh_card_by_id(db, id, jwt_token)

@@ -1,26 +1,36 @@
 import logging
 
 from fastapi import Depends, HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from app.core.config import TOKEN_EXPIRE_SECONDS
-from app.core.security import create_token, decode_token
+from app.core.security import create_token, decode_token, security
 from app.models.card import CardToken
 from app.schemas.card import CardTokenCreate
 from app.services.utils import get_db
 
 logger = logging.getLogger(__name__)
-security = HTTPBearer()
         
 def mask_card_number(card_number: str) -> str:
-    if not card_number.isdigit() or len(card_number) < 13 or len(card_number) > 19:
-        raise ValueError("Invalid card number format")
-
+    """mask all but the last 4 digits of a card number."""
+    
     return f"{'*' * (len(card_number) - 4)}{card_number[-4:]}"
 
-def save_card_to_db(db: Session, card_data: CardTokenCreate, user_id: str) -> CardToken:    
+def save_card_to_db(db: Session, card_data: CardTokenCreate, user_id: str) -> CardToken:
+    """
+    create a new card token in the database.
+    
+    args:
+        db: database session
+        card_data: card information to tokenize
+        user_id: id of the user creating the token
+        
+    returns:
+        created CardToken object
+    """
+    
     payload = {
         "cardholder_name": card_data.cardholder_name,
         "expiry_month": card_data.expiry_month,
@@ -47,6 +57,17 @@ def save_card_to_db(db: Session, card_data: CardTokenCreate, user_id: str) -> Ca
     return db_card
 
 def get_all_cards(db: Session, user_id: str) -> list[CardToken]:
+    """
+    get all active card tokens for a user.
+    
+    args:
+        db: database session
+        user_id: id of the user
+        
+    returns:
+        list of active CardToken objects
+    """
+    
     now = datetime.now(timezone.utc)
     return db.query(CardToken).filter(
         CardToken.user_id == user_id,
@@ -55,6 +76,18 @@ def get_all_cards(db: Session, user_id: str) -> list[CardToken]:
     ).all()
 
 def get_card_by_id(db: Session, card_id: str, user_id: str) -> CardToken | None:
+    """
+    get a specific card token by id.
+    
+    args:
+        db: database session
+        card_id: id of the card token
+        user_id: id of the user
+        
+    returns:
+        CardToken if found and active, None otherwise
+    """
+    
     card = db.query(CardToken).filter(
         CardToken.id == card_id,
         CardToken.user_id == user_id
@@ -70,12 +103,27 @@ def get_card_by_id(db: Session, card_id: str, user_id: str) -> CardToken | None:
     return card
 
 def revoke_card_by_id(db: Session, card_id: str, jwt_token: str) -> CardToken:
+    """
+    revoke a card token.
+    
+    args:
+        db: database session
+        card_id: id of the card token
+        jwt_token: jwt token string for verification
+        
+    returns:
+        updated CardToken object
+        
+    raises:
+        ValueError: if card not found or already revoked
+    """
+    
     card = db.query(CardToken).filter(CardToken.id == card_id, CardToken.jwt_token == jwt_token).first()
 
     if not card:
-        raise ValueError("Card not found or token mismatch")
+        raise ValueError("card not found or token mismatch")
     if card.is_revoked:
-        raise ValueError("Card is already revoked")
+        raise ValueError("card is already revoked")
 
     card.is_revoked = True
     db.commit()
@@ -84,23 +132,50 @@ def revoke_card_by_id(db: Session, card_id: str, jwt_token: str) -> CardToken:
     return card
 
 def delete_card(db: Session, card_id: str, jwt_token: str) -> None:
+    """
+    delete a card token permanently.
+    
+    args:
+        db: database session
+        card_id: id of the card token
+        jwt_token: jwt token string for verification
+        
+    raises:
+        ValueError: if card not found
+    """
+    
     card = db.query(CardToken).filter(CardToken.id == card_id, CardToken.jwt_token == jwt_token).first()
     
     if not card:
-        raise ValueError("Card not found or token mismatch")
+        raise ValueError("card not found or token mismatch")
 
     db.delete(card)
     db.commit()
 
 def refresh_card_by_id(db: Session, card_id: str, jwt_token: str) -> CardToken:
+    """
+    refresh a card token's expiration time.
+    
+    args:
+        db: database session
+        card_id: id of the card token
+        jwt_token: jwt token string for verification
+        
+    returns:
+        updated CardToken object
+        
+    raises:
+        ValueError: if card not found, revoked, or expired
+    """
+    
     card = db.query(CardToken).filter(CardToken.id == card_id, CardToken.jwt_token == jwt_token).first()
     
     if not card:
-        raise ValueError("Card not found or token mismatch")
+        raise ValueError("card not found or token mismatch")
     if card.is_revoked:
-        raise ValueError("Card is revoked")
+        raise ValueError("card is revoked")
     if card.expires_at < datetime.now(timezone.utc):
-        raise ValueError("Card has expired")
+        raise ValueError("card has expired")
     
     payload = decode_token(card.jwt_token)
     
@@ -116,12 +191,26 @@ def verify_card(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ):
+    """
+    verify a card token and get its payload.
+    
+    args:
+        credentials: http authorization credentials
+        db: database session
+        
+    returns:
+        dictionary with token payload and user id
+        
+    raises:
+        HTTPException: if token is invalid or revoked
+    """
+    
     jwt_token_str = credentials.credentials
     payload = decode_token(jwt_token_str)
     
     token_obj = db.query(CardToken).filter(CardToken.jwt_token == jwt_token_str).first()
     if not token_obj or token_obj.is_revoked:
-        raise HTTPException(status_code=401, detail="Card is revoked or invalid.")
+        raise HTTPException(status_code=401, detail="card is revoked or invalid.")
 
     return {
         "payload": payload,

@@ -3,12 +3,11 @@ import uuid
 from sqlalchemy import Column, String, DateTime, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
-from pydantic import BaseModel
-from typing import Optional
 
 from app.db.session import Base
 
 class User(Base):
+    """user model for authentication and account management."""
     __tablename__ = "users"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

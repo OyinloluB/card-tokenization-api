@@ -6,15 +6,21 @@ import re
 from datetime import date
 
 class CardScope(str, Enum):
+    """defines the available permission scopes for card tokens."""
+    
     READ_ONLY = "read-only"
     FULL_ACCESS = "full-access"
     REFRESH_ONLY = "refresh-only"
     
 class CardTokenBase(BaseModel):
+    """base schema with common card token fields."""
+    
     cardholder_name: str = Field(..., min_length=2, max_length=100)
     scope: CardScope = Field(default=CardScope.FULL_ACCESS)
 
 class CardTokenCreate(CardTokenBase):
+    """schema for creating a new card token."""
+    
     card_number: str = Field(..., min_length=13, max_length=19, pattern=r'^\d+$')
     expiry_month: int = Field(..., ge=1, le=12)
     expiry_year: int = Field(..., ge=2000)
@@ -28,7 +34,7 @@ class CardTokenCreate(CardTokenBase):
         v = re.sub(r'[\s-]', '', v)
         
         if not v.isdigit():
-            raise ValueError("Card number must contain only digits")
+            raise ValueError("card number must contain only digits")
             
         # Luhn algorithm validation
         digits = [int(d) for d in v]
@@ -41,7 +47,7 @@ class CardTokenCreate(CardTokenBase):
         digits = [d - 9 if d > 9 else d for d in digits]
         # check if sum + checksum is divisible by 10
         if (sum(digits) + checksum) % 10 != 0:
-            raise ValueError("Invalid card number")
+            raise ValueError("invalid card number")
             
         return v
     
@@ -53,11 +59,13 @@ class CardTokenCreate(CardTokenBase):
         
         if (self.expiry_year < current_year or 
             (self.expiry_year == current_year and self.expiry_month < current_month)):
-            raise ValueError("Card has expired")
+            raise ValueError("card has expired")
             
         return self
     
 class CardTokenRead(BaseModel):
+    """schema for reading card token data."""
+    
     id: str
     jwt_token: str
     masked_card_number: str
@@ -73,4 +81,10 @@ class CardTokenRead(BaseModel):
     
 class CardTokenUpdate(BaseModel):
     """schema for updating a card token."""
+    
     scope: Optional[CardScope] = None
+    
+class CardDeleteResponse(BaseModel):
+    """response schema for card deletion."""
+    
+    message: str

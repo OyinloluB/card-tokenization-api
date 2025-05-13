@@ -100,12 +100,11 @@ def get_card_by_id(db: Session, card_id: str, user_id: str) -> CardToken | None:
     
     return card
 
-def revoke_card_by_id(db: Session, card_id: str, user_id: str) -> CardToken:
-    card = db.query(CardToken).filter(CardToken.id == card_id, CardToken.user_id == user_id).first()
+def revoke_card_by_id(db: Session, card_id: str, jwt_token: str) -> CardToken:
+    card = db.query(CardToken).filter(CardToken.id == card_id, CardToken.jwt_token == jwt_token).first()
 
     if not card:
-        raise ValueError("Card not found")
-
+        raise ValueError("Card not found or token mismatch")
     if card.is_revoked:
         raise ValueError("Card is already revoked")
 
@@ -115,46 +114,34 @@ def revoke_card_by_id(db: Session, card_id: str, user_id: str) -> CardToken:
 
     return card
 
-def delete_card(db: Session, card_id: str, user_id: str) -> None:
-    card = db.query(CardToken).filter(CardToken.id == card_id, CardToken.user_id == user_id).first()
+def delete_card(db: Session, card_id: str, jwt_token: str) -> None:
+    card = db.query(CardToken).filter(CardToken.id == card_id, CardToken.jwt_token == jwt_token).first()
     
     if not card:
-        raise ValueError("Card not found or you do not have access to delete it.")
+        raise ValueError("Card not found or token mismatch")
 
     db.delete(card)
     db.commit()
 
-def refresh_card_by_id(db: Session, card_id: str, user_id: str) -> CardToken:
-    print(f"The value is: {user_id}")
-
-    card = db.query(CardToken).filter(CardToken.id == card_id, CardToken.user_id == user_id).first()
+def refresh_card_by_id(db: Session, card_id: str, jwt_token: str) -> CardToken:
+    card = db.query(CardToken).filter(CardToken.id == card_id, CardToken.jwt_token == jwt_token).first()
     
     if not card:
-        raise ValueError("Card not found")
-    
+        raise ValueError("Card not found or token mismatch")
     if card.is_revoked:
         raise ValueError("Card is revoked")
-    
     if card.expires_at < datetime.now(timezone.utc):
         raise ValueError("Card has expired")
     
     payload = decode_card_tokens(card.jwt_token)
     
-    new_card_token = create_card(payload)
-    new_expires_at = datetime.now(timezone.utc) + timedelta(seconds=TOKEN_EXPIRE_SECONDS)
+    card.jwt_token = create_card(payload)
+    card.expires_at = datetime.now(timezone.utc) + timedelta(seconds=TOKEN_EXPIRE_SECONDS)
     
-    new_token = CardToken(
-        user_id=card.user_id,
-        jwt_token=new_card_token,
-        masked_card_number=card.masked_card_number,
-        cardholder_name=card.cardholder_name,
-        expires_at=new_expires_at
-    )
-    
-    db.add(new_token)
     db.commit()
-    db.refresh(new_token)
-    return new_token
+    db.refresh(card)
+    
+    return card
 
 def verify_card(
     credentials: HTTPAuthorizationCredentials = Depends(security),

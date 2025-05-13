@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from app.schemas.card import CardTokenCreate, CardTokenRead
 from app.services.card_service import (
     get_db,
-    decode_card_tokens,
     save_card_to_db,
     revoke_card_by_id,
     get_all_cards,
@@ -23,11 +22,6 @@ router = APIRouter()
 def protected_route(
     user_payload: dict = Depends(verify_card),
 ):
-    """
-    verifies that the JWT card token is valid.
-    returns basic user info extracted from the token.
-    """
-    
     return {
         "message": "You have access!",
         "user_id": user_payload.get("sub"),
@@ -78,37 +72,35 @@ def list_card_by_id(
 def revoke_card(
     id: str,
     card_info: dict = Depends(verify_card),
+    credentials: HTTPAuthorizationCredentials = Security(security),
     db: Session = Depends(get_db)
 ):
     payload = card_info["payload"]
-    user_id = card_info["sub"]
+    jwt_token = credentials.credentials
     
     if payload.get("scope") != "full-access":
         raise HTTPException(status_code=403, detail="You don't have revoke permissions")
 
     try:
-        card = revoke_card_by_id(db, id, user_id)
-        return card
+        return revoke_card_by_id(db, id, jwt_token)
     except ValueError as e:
-        raise HTTPException(
-            status_code=400 if "already" in str(e) else 404,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=400 if "already" in str(e) else 404, detail=str(e))
 
 @router.delete("/card/{id}")
-def delete_card(
+def delete_token(
     id: str,
     card_info: dict = Depends(verify_card),
+    credentials: HTTPAuthorizationCredentials = Security(security),
     db: Session = Depends(get_db)
 ):
     payload = card_info["payload"]
-    user_id = card_info["sub"]
-    
+    jwt_token = credentials.credentials
+
     if payload.get("scope") != "full-access":
         raise HTTPException(status_code=403, detail="You don't have delete permissions")
     
     try:
-        delete_card(db, id, user_id)
+        delete_card(db, id, jwt_token)
         return {"message": "Card deleted successfully"}
     except ValueError as e:
        raise HTTPException(status_code=404, detail=str(e))
@@ -117,16 +109,16 @@ def delete_card(
 def refresh_token(
     id: str,
     card_info: dict = Depends(verify_card),
+    credentials: HTTPAuthorizationCredentials = Security(security),
     db: Session = Depends(get_db)
 ):
     payload = card_info["payload"]
-    user_id = card_info["sub"]
+    jwt_token = credentials.credentials
     
     if payload.get("scope") not in ["refresh-only", "full-access"]:
         raise HTTPException(status_code=403, detail="You don't have refresh permissions")
 
     try:
-        new_card = refresh_card_by_id(db, id, user_id)
-        return new_card
+        return refresh_card_by_id(db, id, jwt_token)
     except ValueError as e:
-        raise HTTPAuthorizationCredentials(status_code=400 if "already" in str(e) or "expired" in str(e) else 404, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))

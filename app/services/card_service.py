@@ -1,12 +1,11 @@
-# generating tokens with expiration
-# decoding & validating tokens
-# maybe: refresh logic later
+import logging
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
+from typing import Dict, List, Optional, Union, Any
 
 from app.core.config import JWT_SECRET_KEY, JWT_ALGORITHM, TOKEN_EXPIRE_SECONDS
 from app.models.user import User
@@ -14,6 +13,7 @@ from app.models.card import CardToken
 from app.schemas.card import CardTokenCreate
 from app.db.session import SessionLocal
 
+logger = logging.getLogger(__name__)
 security = HTTPBearer()
  
 # get db session
@@ -25,33 +25,60 @@ def get_db():
         db.close()
         
 def mask_card_number(card_number: str) -> str:
+    if not card_number.isdigit() or len(card_number) < 13 or len(card_number) > 19:
+        raise ValueError("Invalid card number format")
+
     return f"{'*' * (len(card_number) - 4)}{card_number[-4:]}"
 
-def create_card(data: dict) -> str: 
+def create_card(data: Dict[str, Any]) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(seconds=TOKEN_EXPIRE_SECONDS)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
     return encoded_jwt
 
-def decode_card_tokens(card: str) -> dict:
+def decode_card_tokens(card: str) -> Dict[str, Any]:
     try:
         payload = jwt.decode(card, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
         return payload
-    except JWTError:
+    except JWTError as e:
+        logger.warning(f"Invalid card token: {str(e)}")
         raise ValueError("Invalid or expired token")
     
-def decode_user_tokens(user: str) -> dict:
-    print(f"The value is: {user}")
-    
+def decode_user_tokens(user: str) -> Dict[str, Any]:
     try:
         payload = jwt.decode(user, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
-        print(f"The value is: {payload}")
+        logger.debug(f"Decoded user token payload: {payload}")
         return payload
-    except JWTError:
+    except JWTError as e:
+        logger.warning(f"Invalid user token: {str(e)}")
         raise ValueError("Invalid or expired user token")
     
+def validate_card_data(card_data: CardTokenCreate) -> None:
+    if not card_data.card_number.isdigit() or len(card_data.card_number) < 13 or len(card_data.card_number) > 19:
+        raise ValueError("Invalid card number format")
+    
+    # validate expiry date
+    current_year = datetime.now().year
+    current_month = datetime.now().month
+    
+    if not (1 <= card_data.expiry_month <= 12):
+        raise ValueError("Invalid expiry month")
+        
+    if card_data.expiry_year < current_year or (card_data.expiry_year == current_year and card_data.expiry_month < current_month):
+        raise ValueError("Card has expired")
+        
+    # validate CVV
+    if not card_data.cvv.isdigit() or not (3 <= len(card_data.cvv) <= 4):
+        raise ValueError("Invalid CVV format")
+        
+    # validate cardholder name
+    if not card_data.cardholder_name or len(card_data.cardholder_name) < 2:
+        raise ValueError("Invalid cardholder name")
+
 def save_card_to_db(db: Session, card_data: CardTokenCreate, user_id: str) -> CardToken:
+    validate_card_data(card_data)
+    
     payload = {
         "cardholder_name": card_data.cardholder_name,
         "expiry_month": card_data.expiry_month,

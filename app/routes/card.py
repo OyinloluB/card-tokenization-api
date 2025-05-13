@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
+from typing import Callable, Dict, List
 
 from app.schemas.card import CardTokenCreate, CardTokenRead
 from app.services.card_service import (
@@ -16,7 +17,18 @@ from app.services.card_service import (
 )
 
 security = HTTPBearer()
-router = APIRouter()
+router = APIRouter(prefix="/cards", tags=["Cards"])
+
+def require_scope(allowed_scopes: List[str]):
+    def scope_checker(card_info: dict = Depends(verify_card)):
+        payload = card_info["payload"]
+        if payload.get("scope") not in allowed_scopes:
+            raise HTTPException(
+                status_code=403, 
+                detail=f"Insufficient permissions. Required scopes: {', '.join(allowed_scopes)}"
+            )
+        return card_info
+    return scope_checker
 
 @router.get("/protected", tags=["Utility"])
 def protected_route(
@@ -29,7 +41,7 @@ def protected_route(
         "scope": user_payload.get("scope")
     }
 
-@router.post("/card", response_model=CardTokenRead)
+@router.post("", response_model=CardTokenRead)
 def issue_card(
     payload: CardTokenCreate,
     user_payload: dict = Depends(verify_user),
@@ -38,12 +50,14 @@ def issue_card(
     user_id = user_payload.get("sub")
     
     try:
-        db = save_card_to_db(db, payload, user_id)
-        return db
+        card_token = save_card_to_db(db, payload, user_id)
+        return card_token
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
-@router.get("/card", response_model=list[CardTokenRead])
+@router.get("", response_model=List[CardTokenRead])
 def list_cards(
     user_payload: dict = Depends(verify_user),
     db: Session = Depends(get_db)
@@ -51,53 +65,44 @@ def list_cards(
     user_id = user_payload.get("sub")
     return get_all_cards(db, user_id)
 
-@router.get("/card/{id}", response_model=CardTokenRead)
+@router.get("/{id}", response_model=CardTokenRead)
 def list_card_by_id(
     id: str,
-    card_info: dict = Depends(verify_card),
+    card_info: dict = Depends(require_scope(["read-only", "full-access", "refresh-only"])),
     db: Session = Depends(get_db)
 ):
-    payload = card_info["payload"]
     user_id = card_info["sub"]
     
-    if payload.get("scope") not in ["read-only", "full-access", "refresh-only"]:
-        raise HTTPException(status_code=403, detail="You don't have read permissions")
-
     card = get_card_by_id(db, id, user_id)
     if not card:
         raise HTTPException(status_code=404, detail="Card not found")
     return card
 
-@router.patch("/card/{id}/revoke", response_model=CardTokenRead)
+@router.patch("/{id}/revoke", response_model=CardTokenRead)
 def revoke_card(
-    id: str,
-    card_info: dict = Depends(verify_card),
-    credentials: HTTPAuthorizationCredentials = Security(security),
-    db: Session = Depends(get_db)
+   id: str,
+   card_info: dict = Depends(require_scope(["full-access"])),
+   credentials: HTTPAuthorizationCredentials = Security(security),
+   db: Session = Depends(get_db)
 ):
-    payload = card_info["payload"]
     jwt_token = credentials.credentials
     
-    if payload.get("scope") != "full-access":
-        raise HTTPException(status_code=403, detail="You don't have revoke permissions")
-
     try:
         return revoke_card_by_id(db, id, jwt_token)
     except ValueError as e:
-        raise HTTPException(status_code=400 if "already" in str(e) else 404, detail=str(e))
+        if "already" in str(e):
+            raise HTTPException(status_code=400, detail=str(e))
+        else:
+            raise HTTPException(status_code=404, detail=str(e))
 
-@router.delete("/card/{id}")
+@router.delete("/{id}", response_model=dict)
 def delete_token(
     id: str,
-    card_info: dict = Depends(verify_card),
+    card_info: dict = Depends(require_scope(["full-access"])),
     credentials: HTTPAuthorizationCredentials = Security(security),
     db: Session = Depends(get_db)
 ):
-    payload = card_info["payload"]
     jwt_token = credentials.credentials
-
-    if payload.get("scope") != "full-access":
-        raise HTTPException(status_code=403, detail="You don't have delete permissions")
     
     try:
         delete_card(db, id, jwt_token)
@@ -105,19 +110,15 @@ def delete_token(
     except ValueError as e:
        raise HTTPException(status_code=404, detail=str(e))
     
-@router.post("/card/{id}/refresh", response_model=CardTokenRead)
+@router.post("/{id}/refresh", response_model=CardTokenRead)
 def refresh_token(
     id: str,
-    card_info: dict = Depends(verify_card),
+    card_info: dict = Depends(require_scope(["refresh-only", "full-access"])),
     credentials: HTTPAuthorizationCredentials = Security(security),
     db: Session = Depends(get_db)
 ):
-    payload = card_info["payload"]
     jwt_token = credentials.credentials
     
-    if payload.get("scope") not in ["refresh-only", "full-access"]:
-        raise HTTPException(status_code=403, detail="You don't have refresh permissions")
-
     try:
         return refresh_card_by_id(db, id, jwt_token)
     except ValueError as e:

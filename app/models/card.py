@@ -1,25 +1,32 @@
-# creating token model
-# record of all generated tokens
-# used to store tokens
+import uuid
 
-from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey
+from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-import uuid
-from datetime import datetime, timezone
+from sqlalchemy.sql import func
 
 from app.db.session import Base
 class CardToken(Base):
     __tablename__ = "card_tokens"
     
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    jwt_token = Column(String, nullable=False, unique=True)
-    masked_card_number = Column(String, nullable=False)
-    cardholder_name = Column(String, nullable=False)
-    scope = Column(String, nullable=False, default="full-access")
-    expires_at = Column(DateTime(timezone=True), nullable=False)
-    is_revoked = Column(Boolean, default=False)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    
+    jwt_token = Column(String(500), nullable=False, unique=True, index=True)
+    masked_card_number = Column(String(24), nullable=False)
+    cardholder_name = Column(String(100), nullable=False)
+    scope = Column(String(20), nullable=False, default="full-access")
+    
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    is_revoked = Column(Boolean, default=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     user = relationship("User", backref="card_tokens")
+    
+    __table_args__ = (
+        Index('idx_card_tokens_active', 'is_revoked', 'expires_at'),
+    )
+    
+def __repr__(self):
+        """String representation of the CardToken."""
+        return f"<CardToken(id={self.id}, user_id={self.user_id}, expires_at={self.expires_at})>"

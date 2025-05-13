@@ -1,15 +1,21 @@
+import os
+import logging
+from datetime import datetime, timezone
+
 from fastapi import FastAPI
 from fastapi.security import HTTPBearer
 from fastapi.openapi.utils import get_openapi
 from contextlib import asynccontextmanager
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
+from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
 from app.db.session import engine
-from app.models.card import Base
+from app.models.card import Base, CardToken
 from app.routes import card, auth
 
-import os
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -17,23 +23,22 @@ load_dotenv()
 async def lifespan(app: FastAPI):
     try:
         with engine.connect() as conn:
-            print("Connected to the database successfully!")
+            logger.info("Connected to the database successfully!")
             
             # clean expired card jwt tokens
-            from app.models.card import CardToken
-            from sqlalchemy.orm import Session
-            from datetime import datetime, timezone
-            
             session = Session(bind=conn)
             now = datetime.now(timezone.utc)
             
             deleted = session.query(CardToken).filter(CardToken.expires_at < now).delete()
             session.commit()
             
-            print(f"Deleted {deleted} expired virtual card(s).")
+            logger.info(f"Deleted {deleted} expired virtual card(s).")
     except OperationalError:
-        print("Failed to connect to the database.")
+        logger.error("Failed to connect to the database.", exc_info=True)
+    except SQLAlchemyError as e:
+        logger.error(f"Database error during startup: {str(e)}", exc_info=True)
     yield
+
 
 app = FastAPI(
     title="Card Tokenization API",

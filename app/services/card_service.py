@@ -9,6 +9,7 @@ from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 
 from app.core.config import JWT_SECRET_KEY, JWT_ALGORITHM, TOKEN_EXPIRE_SECONDS
+from app.models.user import User
 from app.models.card import CardToken
 from app.schemas.card import CardTokenCreate
 from app.db.session import SessionLocal
@@ -33,12 +34,22 @@ def create_card(data: dict) -> str:
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
     return encoded_jwt
 
-def decode_card(card: str) -> dict:
+def decode_card_tokens(card: str) -> dict:
     try:
         payload = jwt.decode(card, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
         return payload
     except JWTError:
-        raise ValueError("Invalid or expired card")
+        raise ValueError("Invalid or expired token")
+    
+def decode_user_tokens(user: str) -> dict:
+    print(f"The value is: {user}")
+    
+    try:
+        payload = jwt.decode(user, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        print(f"The value is: {payload}")
+        return payload
+    except JWTError:
+        raise ValueError("Invalid or expired user token")
     
 def save_card_to_db(db: Session, card_data: CardTokenCreate, user_id: str) -> CardToken:
     payload = {
@@ -114,6 +125,8 @@ def delete_card(db: Session, card_id: str, user_id: str) -> None:
     db.commit()
 
 def refresh_card_by_id(db: Session, card_id: str, user_id: str) -> CardToken:
+    print(f"The value is: {user_id}")
+
     card = db.query(CardToken).filter(CardToken.id == card_id, CardToken.user_id == user_id).first()
     
     if not card:
@@ -125,7 +138,7 @@ def refresh_card_by_id(db: Session, card_id: str, user_id: str) -> CardToken:
     if card.expires_at < datetime.now(timezone.utc):
         raise ValueError("Card has expired")
     
-    payload = decode_card(card.jwt_token)
+    payload = decode_card_tokens(card.jwt_token)
     
     new_card_token = create_card(payload)
     new_expires_at = datetime.now(timezone.utc) + timedelta(seconds=TOKEN_EXPIRE_SECONDS)
@@ -133,7 +146,7 @@ def refresh_card_by_id(db: Session, card_id: str, user_id: str) -> CardToken:
     new_token = CardToken(
         user_id=card.user_id,
         jwt_token=new_card_token,
-        mask_card_number=card.masked_card_number,
+        masked_card_number=card.masked_card_number,
         cardholder_name=card.cardholder_name,
         expires_at=new_expires_at
     )
@@ -148,15 +161,32 @@ def verify_card(
     db: Session = Depends(get_db)
 ):
     jwt_token_str = credentials.credentials
+    payload = decode_card_tokens(jwt_token_str)
     
-    try:
-        payload = decode_card(jwt_token_str)
-    except ValueError as e:
-        raise HTTPException(status_code=401, detail=str(e))
+    print(f"The value is: {payload}")
     
     token_obj = db.query(CardToken).filter(CardToken.jwt_token == jwt_token_str).first()
-    
     if not token_obj or token_obj.is_revoked:
         raise HTTPException(status_code=401, detail="Card is revoked or invalid.")
+
+    return {
+        "payload": payload,
+        "sub": str(token_obj.user_id)
+    }
+
+def verify_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+):
+    jwt_token_str = credentials.credentials
+    payload = decode_user_tokens(jwt_token_str)
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID missing in token")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
 
     return payload

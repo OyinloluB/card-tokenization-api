@@ -5,14 +5,15 @@ from sqlalchemy.orm import Session
 from app.schemas.card import CardTokenCreate, CardTokenRead
 from app.services.card_service import (
     get_db,
-    decode_card,
+    decode_card_tokens,
     save_card_to_db,
     revoke_card_by_id,
     get_all_cards,
     get_card_by_id,
     delete_card,
     refresh_card_by_id,
-    verify_card
+    verify_card,
+    verify_user
 )
 
 security = HTTPBearer()
@@ -37,7 +38,7 @@ def protected_route(
 @router.post("/card", response_model=CardTokenRead)
 def issue_card(
     payload: CardTokenCreate,
-    user_payload: dict = Depends(verify_card),
+    user_payload: dict = Depends(verify_user),
     db: Session = Depends(get_db)
 ):
     user_id = user_payload.get("sub")
@@ -50,25 +51,22 @@ def issue_card(
 
 @router.get("/card", response_model=list[CardTokenRead])
 def list_cards(
-    user_payload: dict = Depends(verify_card),
+    user_payload: dict = Depends(verify_user),
     db: Session = Depends(get_db)
 ):
     user_id = user_payload.get("sub")
-    
-    if user_payload.get("scope") not in ["read-only", "full-access", "refresh-only"]:
-        raise HTTPException(status_code=403, detail="You don't have read permissions")
-    
     return get_all_cards(db, user_id)
 
 @router.get("/card/{id}", response_model=CardTokenRead)
-def get_card_by_id(
+def list_card_by_id(
     id: str,
-    user_payload: dict = Depends(verify_card),
+    card_info: dict = Depends(verify_card),
     db: Session = Depends(get_db)
 ):
-    user_id = user_payload.get("sub")
+    payload = card_info["payload"]
+    user_id = card_info["sub"]
     
-    if user_payload.get("scope") not in ["read-only", "full-access", "refresh-only"]:
+    if payload.get("scope") not in ["read-only", "full-access", "refresh-only"]:
         raise HTTPException(status_code=403, detail="You don't have read permissions")
 
     card = get_card_by_id(db, id, user_id)
@@ -79,12 +77,13 @@ def get_card_by_id(
 @router.patch("/card/{id}/revoke", response_model=CardTokenRead)
 def revoke_card(
     id: str,
-    user_payload: dict = Depends(verify_card),
+    card_info: dict = Depends(verify_card),
     db: Session = Depends(get_db)
 ):
-    user_id = user_payload.get("sub")
+    payload = card_info["payload"]
+    user_id = card_info["sub"]
     
-    if user_payload.get("scope") != "full-access":
+    if payload.get("scope") != "full-access":
         raise HTTPException(status_code=403, detail="You don't have revoke permissions")
 
     try:
@@ -99,12 +98,13 @@ def revoke_card(
 @router.delete("/card/{id}")
 def delete_card(
     id: str,
-    user_payload: dict = Depends(verify_card), 
+    card_info: dict = Depends(verify_card),
     db: Session = Depends(get_db)
 ):
-    user_id = user_payload.get("sub")
+    payload = card_info["payload"]
+    user_id = card_info["sub"]
     
-    if user_payload.get("scope") != "full-access":
+    if payload.get("scope") != "full-access":
         raise HTTPException(status_code=403, detail="You don't have delete permissions")
     
     try:
@@ -116,12 +116,13 @@ def delete_card(
 @router.post("/card/{id}/refresh", response_model=CardTokenRead)
 def refresh_token(
     id: str,
-    user_payload: dict = Depends(verify_card),
+    card_info: dict = Depends(verify_card),
     db: Session = Depends(get_db)
 ):
-    user_id = user_payload.get("sub")
+    payload = card_info["payload"]
+    user_id = card_info["sub"]
     
-    if user_payload.get("scope") not in ["refresh-only", "full-access"]:
+    if payload.get("scope") not in ["refresh-only", "full-access"]:
         raise HTTPException(status_code=403, detail="You don't have refresh permissions")
 
     try:

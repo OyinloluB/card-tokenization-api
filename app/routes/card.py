@@ -17,7 +17,7 @@ from app.services.auth_service import verify_user
 from app.services.utils import get_db
 
 security = HTTPBearer()
-router = APIRouter(prefix="/cards", tags=["Cards"])
+router = APIRouter(prefix="/card", tags=["Cards"])
 
 def require_scope(allowed_scopes: List[str]):
     """create a dependency that checks if the card token has the required scope."""

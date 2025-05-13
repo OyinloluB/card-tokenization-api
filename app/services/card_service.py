@@ -102,13 +102,13 @@ def get_card_by_id(db: Session, card_id: str, user_id: str) -> CardToken | None:
     
     return card
 
-def revoke_card_by_id(db: Session, card_id: str, jwt_token: str) -> CardToken:
+def revoke_card_by_id(db: Session, card: CardToken, jwt_token: str) -> CardToken:
     """
     revoke a card token.
     
     args:
         db: database session
-        card_id: id of the card token
+        card: card token object
         jwt_token: jwt token string for verification
         
     returns:
@@ -118,10 +118,8 @@ def revoke_card_by_id(db: Session, card_id: str, jwt_token: str) -> CardToken:
         ValueError: if card not found or already revoked
     """
     
-    card = db.query(CardToken).filter(CardToken.id == card_id, CardToken.jwt_token == jwt_token).first()
-
-    if not card:
-        raise ValueError("card not found or token mismatch")
+    if card.jwt_token != jwt_token:
+        raise ValueError("token mismatch")
     if card.is_revoked:
         raise ValueError("card is already revoked")
 
@@ -131,34 +129,32 @@ def revoke_card_by_id(db: Session, card_id: str, jwt_token: str) -> CardToken:
 
     return card
 
-def delete_card(db: Session, card_id: str, jwt_token: str) -> None:
+def delete_card_by_id(db: Session, card: CardToken, jwt_token: str) -> None:
     """
     delete a card token permanently.
     
     args:
         db: database session
-        card_id: id of the card token
+        card: card token object
         jwt_token: jwt token string for verification
         
     raises:
         ValueError: if card not found
     """
     
-    card = db.query(CardToken).filter(CardToken.id == card_id, CardToken.jwt_token == jwt_token).first()
-    
-    if not card:
-        raise ValueError("card not found or token mismatch")
+    if card.jwt_token != jwt_token:
+        raise ValueError("token mismatch")
 
     db.delete(card)
     db.commit()
 
-def refresh_card_by_id(db: Session, card_id: str, jwt_token: str) -> CardToken:
+def refresh_card_by_id(db: Session, card: CardToken, jwt_token: str) -> CardToken:
     """
     refresh a card token's expiration time.
     
     args:
         db: database session
-        card_id: id of the card token
+        card: card token object
         jwt_token: jwt token string for verification
         
     returns:
@@ -168,12 +164,10 @@ def refresh_card_by_id(db: Session, card_id: str, jwt_token: str) -> CardToken:
         ValueError: if card not found, revoked, or expired
     """
     
-    card = db.query(CardToken).filter(CardToken.id == card_id, CardToken.jwt_token == jwt_token).first()
-    
-    if not card:
-        raise ValueError("card not found or token mismatch")
+    if card.jwt_token != jwt_token:
+        raise ValueError("token mismatch")
     if card.is_revoked:
-        raise ValueError("card is revoked")
+        raise ValueError("card is already revoked")
     if card.expires_at < datetime.now(timezone.utc):
         raise ValueError("card has expired")
     
@@ -206,13 +200,17 @@ def verify_card(
     """
     
     jwt_token_str = credentials.credentials
-    payload = decode_token(jwt_token_str)
     
-    token_obj = db.query(CardToken).filter(CardToken.jwt_token == jwt_token_str).first()
-    if not token_obj or token_obj.is_revoked:
-        raise HTTPException(status_code=401, detail="card is revoked or invalid.")
+    try:
+        payload = decode_token(jwt_token_str)
+        token_obj = db.query(CardToken).filter(CardToken.jwt_token == jwt_token_str).first()
+        
+        if not token_obj or token_obj.is_revoked:
+            raise HTTPException(status_code=401, detail="card is revoked or invalid.")
 
-    return {
-        "payload": payload,
-        "sub": str(token_obj.user_id)
-    }
+        return {
+            "payload": payload,
+            "sub": str(token_obj.user_id)
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))

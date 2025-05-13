@@ -9,7 +9,7 @@ from app.services.card_service import (
     revoke_card_by_id,
     get_all_cards,
     get_card_by_id,
-    delete_card,
+    delete_card_by_id,
     refresh_card_by_id,
     verify_card,
 )
@@ -39,10 +39,10 @@ def protected_route(
     """test endpoint to verify card token authentication."""
     
     return {
-        "message": "You have access!",
+        "message": "you have access!",
         "user_id": user_payload.get("sub"),
-        "exp": user_payload.get("exp"),
-        "scope": user_payload.get("scope")
+        "exp": user_payload.get("payload", {}).get("exp"),
+        "scope": user_payload.get("payload", {}).get("scope")
     }
 
 @router.post("", response_model=CardTokenRead)
@@ -89,6 +89,28 @@ def list_card_by_id(
         raise HTTPException(status_code=404, detail="card not found")
     return card
 
+@router.delete("/{id}", response_model=CardDeleteResponse)
+def delete_card(
+    id: str,
+    card_info: dict = Depends(require_scope(["full-access"])),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+    db: Session = Depends(get_db)
+):
+    """delete a card token."""
+    
+    jwt_token = credentials.credentials
+    user_id = card_info["sub"]
+    
+    card = get_card_by_id(db, id, user_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="card not found")
+    
+    try:
+        delete_card_by_id(db, card, jwt_token)
+        return {"message": "card deleted successfully"}
+    except ValueError as e:
+       raise HTTPException(status_code=404, detail=str(e))
+
 @router.patch("/{id}/revoke", response_model=CardTokenRead)
 def revoke_card(
    id: str,
@@ -105,39 +127,16 @@ def revoke_card(
     if not card:
         raise HTTPException(status_code=404, detail="card not found")
     
-    
     try:
-        return revoke_card_by_id(db, id, jwt_token)
+        return revoke_card_by_id(db, card, jwt_token)
     except ValueError as e:
         if "already" in str(e):
             raise HTTPException(status_code=400, detail=str(e))
         else:
             raise HTTPException(status_code=404, detail=str(e))
-
-@router.delete("/{id}", response_model=CardDeleteResponse)
-def delete_token(
-    id: str,
-    card_info: dict = Depends(require_scope(["full-access"])),
-    credentials: HTTPAuthorizationCredentials = Security(security),
-    db: Session = Depends(get_db)
-):
-    """delete a card token."""
-    
-    jwt_token = credentials.credentials
-    user_id = card_info["sub"]
-    
-    card = get_card_by_id(db, id, user_id)
-    if not card:
-        raise HTTPException(status_code=404, detail="card not found")
-    
-    try:
-        delete_card(db, id, jwt_token)
-        return {"message": "card deleted successfully"}
-    except ValueError as e:
-       raise HTTPException(status_code=404, detail=str(e))
-    
+ 
 @router.post("/{id}/refresh", response_model=CardTokenRead)
-def refresh_token(
+def refresh_card(
     id: str,
     card_info: dict = Depends(require_scope(["refresh-only", "full-access"])),
     credentials: HTTPAuthorizationCredentials = Security(security),
@@ -153,6 +152,6 @@ def refresh_token(
         raise HTTPException(status_code=404, detail="card not found")
     
     try:
-        return refresh_card_by_id(db, id, jwt_token)
+        return refresh_card_by_id(db, card, jwt_token)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

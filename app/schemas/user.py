@@ -67,10 +67,33 @@ class UserRead(UserBase):
     }
 class TokenResponse(BaseModel):
     """response schema for token operations."""
-    access_token: str
-    token_type: str = "bearer"
-    user_id: Optional[str] = None
+    
+    access_token: str = Field(
+        ...,
+        description="JWT access token for authentication",
+        example="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    )
+    token_type: str = Field(
+        "bearer",
+        description="Type of token (always 'bearer')",
+        example="bearer"
+    )
+    user_id: Optional[str] = Field(
+        None,
+        description="ID of the authenticated user",
+        example="a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+    )
     
 class MessageResponse(BaseModel):
-    message: str
-    user_id: Optional[str] = None
+    """response schema for operations that return a message."""
+        
+    message: str = Field(
+        ...,
+        description="Response message",
+        example="user created successfully"
+    )
+    user_id: Optional[str] = Field(
+        None,
+        description="User ID (if applicable)",
+        example="a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+    )

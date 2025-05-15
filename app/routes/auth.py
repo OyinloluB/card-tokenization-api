@@ -9,7 +9,13 @@ from app.services.auth_service import create_user, get_user_by_email
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-@router.post("/signup", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/signup", 
+    response_model=MessageResponse, 
+    status_code=status.HTTP_201_CREATED,
+    summary="Register a new user",
+    description="Creates a new user account with the provided email and password."
+)
 def signup(user: UserCreate, db: Session = Depends(get_db)):
     """
     register a new user.
@@ -48,7 +54,14 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
             detail="error creating user"
         )
 
-@router.post("/login", response_model=TokenResponse)
+@router.post(
+    "/login", 
+    response_model=TokenResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Authenticate user",
+    description="Authenticates a user with email and password, returning a JWT token."
+)
+
 def login(user: UserLogin, db: Session = Depends(get_db)):
     """
     authenticate a user and return an access token.

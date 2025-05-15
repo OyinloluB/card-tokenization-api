@@ -54,7 +54,6 @@ app = FastAPI(
 
 security_scheme = HTTPBearer()
 
-
 def custom_openapi():
     """customize the openapi schema with security definitions."""
     
@@ -79,7 +78,6 @@ def custom_openapi():
     return app.openapi_schema
 
 app.openapi = custom_openapi
-
 
 @app.get("/health")
 def health_check():

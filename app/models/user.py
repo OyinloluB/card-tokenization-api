@@ -7,7 +7,18 @@ from sqlalchemy.sql import func
 from app.db.session import Base
 
 class User(Base):
-    """user model for authentication and account management."""
+    """
+    user model for authentication and account management.
+    
+    this model stores user account information including:
+    - identity (email and id)
+    - authentication (hashed password)
+    - account status (active status and login tracking)
+    - timestamps for creation and updates
+    
+    it is connected to card tokens through a one-to-many relationship.
+    """
+    
     __tablename__ = "users"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

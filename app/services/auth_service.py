@@ -67,6 +67,11 @@ def verify_user(
     """
     verify a user JWT token and return the payload.
     
+    this function:
+    1. validates the jwt token format and signature
+    2. extracts the user id from the token
+    3. verifies the user exists in the database
+    
     args:
         credentials: HTTP authorization credentials
         db: database session

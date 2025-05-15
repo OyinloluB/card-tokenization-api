@@ -7,6 +7,18 @@ from sqlalchemy.sql import func
 
 from app.db.session import Base
 class CardToken(Base):
+    """
+    card token model for storing tokenized card information.
+    
+    this model stores the secure representation of credit card data,
+    keeping only masked card numbers and using JWTs for the actual token.
+    
+    it implements:
+    - two-level security (user ownership + specific token verification)
+    - permission scopes to control what operations are allowed
+    - expiration and revocation mechanisms
+    """
+    
     __tablename__ = "card_tokens"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -28,5 +40,6 @@ class CardToken(Base):
     )
     
     def __repr__(self):
-        """String representation of the CardToken."""
+        """string representation of the CardToken."""
+        
         return f"<CardToken(id={self.id}, user_id={self.user_id}, expires_at={self.expires_at})>"

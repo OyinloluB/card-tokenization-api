@@ -188,6 +188,11 @@ def verify_card(
     """
     verify a card token and get its payload.
     
+    this function:
+    1. validates the jwt token format and signature
+    2. checks if the token exists in the database
+    3. verifies the token is not revoked
+    
     args:
         credentials: http authorization credentials
         db: database session

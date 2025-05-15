@@ -6,12 +6,21 @@ import re
 class UserBase(BaseModel):
     """base schema with common user fields."""
       
-    email: EmailStr
+    email: EmailStr = Field(
+        ...,
+        description="User's email address (must be valid format)",
+        example="user@example.com"
+    )
 
 class UserCreate(UserBase):
     """schema for creating a new user."""
     
-    password: str = Field(..., min_length=8)
+    password: str = Field(
+        ..., 
+        min_length=8,
+        description="User's password (min 8 chars, must include uppercase, lowercase and digit)",
+        example="StrongP4ssword"
+    )
     
     @field_validator('password')
     @classmethod
@@ -28,14 +37,30 @@ class UserCreate(UserBase):
 class UserLogin(BaseModel):
     """schema for user login credentials."""
     
-    email: EmailStr
-    password: str
+    email: EmailStr = Field(
+        ...,
+        description="User's email address",
+        example="user@example.com"
+    )
+    password: str = Field(
+        ...,
+        description="User's password",
+        example="StrongP4ssword"
+    )
 
 class UserRead(UserBase):
     """schema for reading user data."""
     
-    id: str
-    created_at: datetime
+    id: str = Field(
+        ...,
+        description="Unique identifier for the user",
+        example="a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+    )
+    created_at: datetime = Field(
+        ...,
+        description="Timestamp when the user was created",
+        example="2023-01-01T12:00:00Z"
+    )
     
     model_config = {
         "from_attributes": True

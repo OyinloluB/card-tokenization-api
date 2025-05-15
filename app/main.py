@@ -21,9 +21,15 @@ load_dotenv()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """
+    lifecycle event handler for the fastapi application.
+    
+    performs database connection verification and cleanup of expired tokens.
+    """
+
     try:
         with engine.connect() as conn:
-            logger.info("Connected to the database successfully!")
+            logger.info("connected to the database successfully!")
             
             # clean expired card jwt tokens
             session = Session(bind=conn)
@@ -32,14 +38,14 @@ async def lifespan(app: FastAPI):
             deleted = session.query(CardToken).filter(CardToken.expires_at < now).delete()
             session.commit()
             
-            logger.info(f"Deleted {deleted} expired virtual card(s).")
+            logger.info(f"deleted {deleted} expired virtual card(s).")
     except OperationalError:
-        logger.error("Failed to connect to the database.", exc_info=True)
+        logger.error("failed to connect to the database.", exc_info=True)
     except SQLAlchemyError as e:
-        logger.error(f"Database error during startup: {str(e)}", exc_info=True)
+        logger.error(f"database error during startup: {str(e)}", exc_info=True)
     yield
 
-
+# Initialize FastAPI app with enhanced documentation
 app = FastAPI(
     title="Card Tokenization API",
     version="1.0.0",
@@ -50,6 +56,8 @@ security_scheme = HTTPBearer()
 
 
 def custom_openapi():
+    """customize the openapi schema with security definitions."""
+    
     if app.openapi_schema:
         return app.openapi_schema
 
@@ -59,6 +67,7 @@ def custom_openapi():
         description="API for tokenizing and managing virtual card credentials.",
         routes=app.routes,
     )
+    
     openapi_schema["components"]["securitySchemes"] = {
         "HTTPBearer": {
             "type": "http",
@@ -74,6 +83,8 @@ app.openapi = custom_openapi
 
 @app.get("/health")
 def health_check():
+    """check api health status."""
+    
     return {"status": "ok"}
 
 app.include_router(card.router)

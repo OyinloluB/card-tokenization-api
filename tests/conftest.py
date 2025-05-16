@@ -1,3 +1,4 @@
+# tests/conftest.py
 import pytest
 from fastapi.testclient import TestClient
 from jose import jwt
@@ -9,9 +10,6 @@ from app.core.config import JWT_ALGORITHM, JWT_SECRET_KEY
 from app.models.user import User
 from app.models.card import CardToken
 from tests.test_config import test_db, client, override_get_db
-
-pytest.fixture(test_db)
-pytest.fixture(client)
 
 @pytest.fixture
 def test_user(test_db):
@@ -38,7 +36,6 @@ def test_user(test_db):
 @pytest.fixture
 def user_token(test_user):
     """create a JWT token for the test user."""
-    
     token_data = {
         "sub": str(test_user.id),
         "email": test_user.email,

@@ -1,3 +1,10 @@
+"""
+smoke tests for card endpoints.
+
+these tests verify that all card api endpoints are correctly registered,
+without testing their complete functionality.
+"""
+
 import pytest
 from fastapi import status
 

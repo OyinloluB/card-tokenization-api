@@ -1,18 +1,22 @@
+"""
+unit tests for card service functions.
+
+these tests verify the core card tokenization functionality including:
+- card number masking
+- card token creation and retrieval
+- card token revocation, deletion, and refresh operations
+"""
+
 import pytest
-from pydantic import field_validator
 from datetime import datetime, timezone, timedelta
-from fastapi import HTTPException
 from unittest.mock import patch, MagicMock
 
 from app.services.card_service import (
     mask_card_number,
-    save_card_to_db,
     get_all_cards,
     get_card_by_id,
     revoke_card_by_id,
     delete_card_by_id,
-    refresh_card_by_id,
-    verify_card
 )
 from app.schemas.card import CardTokenCreate, CardScope
 from app.models.card import CardToken

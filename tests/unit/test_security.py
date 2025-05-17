@@ -1,7 +1,14 @@
+"""
+unit tests for security utilities.
+
+these tests verify the core security functions including:
+- password hashing and verification
+- password strength validation
+- jwt token creation and validation
+"""
+
 import pytest
-import re
 from jose import jwt
-import time
 from datetime import datetime, timedelta, timezone
 
 from app.core.security import (
@@ -66,17 +73,17 @@ class TestPasswordValidation:
             validate_password_strength("Short1")
             
     def test_validate_password_no_uppercase(self):
-        """Test that validate_password_strength raises ValueError for passwords with no uppercase."""
+        """test that validate_password_strength raises ValueError for passwords with no uppercase."""
         with pytest.raises(ValueError, match="password must contain at least one uppercase letter"):
             validate_password_strength("password123")
     
     def test_validate_password_no_lowercase(self):
-        """Test that validate_password_strength raises ValueError for passwords with no lowercase."""
+        """test that validate_password_strength raises ValueError for passwords with no lowercase."""
         with pytest.raises(ValueError, match="password must contain at least one lowercase letter"):
             validate_password_strength("PASSWORD123")
     
     def test_validate_password_no_digit(self):
-        """Test that validate_password_strength raises ValueError for passwords with no digit."""
+        """test that validate_password_strength raises ValueError for passwords with no digit."""
         with pytest.raises(ValueError, match="password must contain at least one digit"):
             validate_password_strength("PasswordOnly")
             

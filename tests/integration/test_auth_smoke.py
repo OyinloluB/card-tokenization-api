@@ -1,3 +1,10 @@
+"""
+smoke tests for authentication endpoints.
+
+these tests verify that auth endpoints are properly registered and responding,
+without testing their full functionality.
+"""
+
 import pytest
 from fastapi import status
 

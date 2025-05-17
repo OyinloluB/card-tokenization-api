@@ -1,15 +1,19 @@
-# tests/unit/test_auth_service.py
+"""
+unit tests for authentication service functions.
+
+these tests verify the core authentication functionality including:
+- user creation and retrieval
+- password validation
+- token verification
+"""
+
 import pytest
 from fastapi import HTTPException
 from unittest.mock import patch, MagicMock
 from sqlalchemy.exc import SQLAlchemyError
-from jose import jwt
-import uuid
 
 from app.services.auth_service import get_user_by_email, create_user, verify_user
 from app.schemas.user import UserCreate
-from app.models.user import User
-from app.core.config import JWT_SECRET_KEY, JWT_ALGORITHM
 from tests.test_config import override_get_db
 
 class TestGetUserByEmail:
@@ -28,6 +32,7 @@ class TestGetUserByEmail:
         
     def test_get_user_by_email_nonexistent(self, test_db):
         """test retrieving a non-existent user by email."""
+        
         db = next(override_get_db())
         
         user = get_user_by_email(db, "nonexistent@example.com")

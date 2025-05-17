@@ -28,3 +28,17 @@ When I have time, I'd like to:
 - Maybe look into contract testing instead of fighting with the current approach
 
 The smoke tests aren't perfect, but they're reliable and catch the obvious issues. The unit tests do the heavy lifting for now.
+
+### Running Tests
+
+To run the test suite:
+
+```bash
+# Run all tests
+python -m pytest
+
+# Run only unit tests
+python -m pytest tests/unit/
+
+# Run only smoke tests
+python -m pytest tests/integration/

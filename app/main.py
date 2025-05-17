@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI
 from fastapi.security import HTTPBearer
 from fastapi.openapi.utils import get_openapi
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -45,7 +46,7 @@ async def lifespan(app: FastAPI):
         logger.error(f"database error during startup: {str(e)}", exc_info=True)
     yield
 
-# Initialize FastAPI app with enhanced documentation
+# initialize FastAPI app with enhanced documentation
 app = FastAPI(
     title="Card Tokenization API",
     version="1.0.0",
@@ -78,6 +79,18 @@ def custom_openapi():
     return app.openapi_schema
 
 app.openapi = custom_openapi
+
+environment = os.getenv("ENVIRONMENT", "development")
+if environment == "production":
+    # add CORS middleware for production
+    origins = [x.strip() for x in os.getenv("CORS_ORIGINS", "*").split(",")]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 @app.get("/health")
 def health_check():

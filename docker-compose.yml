@@ -1,6 +1,21 @@
 version: '3.8'
 
 services:
+  api:
+    build: .
+    container_name: tokenization_api
+    restart: always
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/tokenization_db
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_ALGORITHM=${JWT_ALGORITHM}
+      - TOKEN_EXPIRE_SECONDS=${TOKEN_EXPIRE_SECONDS}
+    volumes:
+      - ./:/app
   db:
     image: postgres:15
     container_name: tokenization_db

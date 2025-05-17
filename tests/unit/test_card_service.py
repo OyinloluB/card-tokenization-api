@@ -246,5 +246,38 @@ class TestRevokeCardById:
             
         assert "already revoked" in str(exc_info.value)
             
+class TestDeleteCardById:
+    """tests for the delete_card_by_id function."""
+
+    def test_delete_card_success(self, test_db, test_user):
+        """test successfully deleting a card."""
+        
+        db = next(override_get_db())
+
+        mock_card = MagicMock(spec=CardToken)
+        mock_card.id = "test-card-id"
+        mock_card.jwt_token = "valid.jwt.token"
+
+        with patch.object(db, 'delete') as mock_delete:
+            with patch.object(db, 'commit') as mock_commit:
+                delete_card_by_id(db, mock_card, "valid.jwt.token")
                 
-    
+                mock_delete.assert_called_once_with(mock_card)
+                mock_commit.assert_called_once()
+                
+    def test_delete_card_token_mismatch(self, test_db, test_user):
+        """test deleting a card with wrong token."""
+        
+        db = next(override_get_db())
+        
+        mock_card = MagicMock(spec=CardToken)
+        mock_card.id = "test-card-id"
+        mock_card.jwt_token = "valid.jwt.token"
+        
+        with pytest.raises(ValueError) as exc_info:
+            delete_card_by_id(db, mock_card, "wrong.jwt.token")
+            
+        assert "token mismatch" in str(exc_info.value)
+                    
+        
+        

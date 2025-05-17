@@ -17,3 +17,7 @@ venv/
 
 # Docker
 *.log
+
+*.db
+*.sqlite
+*.sqlite3

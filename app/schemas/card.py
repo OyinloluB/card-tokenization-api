@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional
 import re
 from datetime import date
+from uuid import UUID
 
 class CardScope(str, Enum):
     """defines the available permission scopes for card tokens."""
@@ -78,7 +79,7 @@ class CardTokenCreate(CardTokenBase):
         digits.reverse()
         
         # double odd-indexed digits
-        digits = [d * 2 if i % 2 else d for i, d in enumerate(digits)]
+        digits = [d * 2 if i % 2 == 0 else d for i, d in enumerate(digits)]
         # subtract 9 from numbers > 9
         digits = [d - 9 if d > 9 else d for d in digits]
         # check if sum + checksum is divisible by 10
@@ -103,7 +104,7 @@ class CardTokenCreate(CardTokenBase):
 class CardTokenRead(BaseModel):
     """schema for reading card token data."""
     
-    id: str = Field(..., description="Unique identifier for the card token")
+    id: UUID = Field(..., description="Unique identifier for the card token")
     jwt_token: str = Field(..., description="JWT token representing the card")
     masked_card_number: str = Field(..., description="Masked card number (only last 4 digits visible)")
     cardholder_name: str = Field(..., description="Name of the cardholder")

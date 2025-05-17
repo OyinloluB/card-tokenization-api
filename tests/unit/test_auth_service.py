@@ -3,6 +3,8 @@ import pytest
 from fastapi import HTTPException
 from unittest.mock import patch, MagicMock
 from sqlalchemy.exc import SQLAlchemyError
+from jose import jwt
+import uuid
 
 from app.services.auth_service import get_user_by_email, create_user, verify_user
 from app.schemas.user import UserCreate
@@ -71,3 +73,84 @@ class TestCreateUser:
                 
         assert exc_info.value.status_code == 500
         assert "database error occurred" in str(exc_info.value.detail)
+
+class TestVerifyUser:
+    """tests for verify_user function."""
+    
+    @patch('app.services.auth_service.decode_token')
+    def test_verify_user_success(self, mock_decode_token, test_db, test_user):
+        """test successful user token verification."""
+
+        db = next(override_get_db())
+        
+        # prepare mock values
+        token_payload = {"sub": str(test_user.id), "email": test_user.email}
+        mock_decode_token.return_value = token_payload
+        
+        # create credentials mock
+        credentials = MagicMock()
+        credentials.credentials = "mock.jwt.token"
+        
+        # override db query to return test_user directly
+        with patch.object(db, 'query') as mock_query:
+            mock_filter = MagicMock()
+            mock_query.return_value.filter.return_value = mock_filter
+            mock_filter.first.return_value = test_user
+            
+            result = verify_user(credentials, db)
+            
+            assert result == token_payload
+            mock_decode_token.assert_called_once_with(credentials.credentials) 
+    
+    @patch('app.services.auth_service.decode_token')
+    def test_verify_user_invalid_token(self, mock_decode_token, test_db):
+        """test handling of invalid token."""
+   
+        db = next(override_get_db())
+        credentials = MagicMock()
+        credentials.credentials = "invalid.token"
+        
+        # configure mock to raise error with the error message format
+        mock_decode_token.side_effect = ValueError("invalid or expired token: Invalid header string")
+        
+        with pytest.raises(ValueError) as exc_info:
+            verify_user(credentials, db)
+        
+        assert "invalid or expired token" in str(exc_info.value)
+    
+    @patch('app.services.auth_service.decode_token')
+    def test_verify_user_missing_sub(self, mock_decode_token, test_db):
+        """test handling of token without user ID."""
+
+        db = next(override_get_db())
+        credentials = MagicMock()
+        credentials.credentials = "token.without.sub"
+        
+        mock_decode_token.return_value = {"email": "user@example.com"}
+        
+        with pytest.raises(HTTPException) as exc_info:
+            verify_user(credentials, db)
+        
+        assert exc_info.value.status_code == 400
+        assert "user ID missing in token" in str(exc_info.value.detail)
+            
+    @patch('app.services.auth_service.decode_token')
+    def test_verify_user_nonexistent_user(self, mock_decode_token, test_db):
+        """test handling of token with non-existent user ID."""
+
+        db = next(override_get_db())
+        credentials = MagicMock()
+        credentials.credentials = "token.with.nonexistent.user"
+        
+        mock_decode_token.return_value = {"sub": "nonexistent-user-id"}
+        
+        with patch.object(db, 'query') as mock_query:
+            mock_filter = MagicMock()
+            mock_query.return_value.filter.return_value = mock_filter
+            mock_filter.first.return_value = None
+            
+            with pytest.raises(HTTPException) as exc_info:
+                verify_user(credentials, db)
+            
+            assert exc_info.value.status_code == 404
+            assert "user not found" in str(exc_info.value.detail)

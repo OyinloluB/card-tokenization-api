@@ -278,6 +278,3 @@ class TestDeleteCardById:
             delete_card_by_id(db, mock_card, "wrong.jwt.token")
             
         assert "token mismatch" in str(exc_info.value)
-                    
-        
-        

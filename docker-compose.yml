@@ -64,6 +64,20 @@ services:
       done
       '
 
+  nginx:
+    image: nginx:latest
+    container_name: tokenization_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - api
+    restart: always
+
 volumes:
   postgres_data:
     driver: local

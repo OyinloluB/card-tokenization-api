@@ -21,3 +21,6 @@ venv/
 *.db
 *.sqlite
 *.sqlite3
+
+backups/
+nginx/ssl/

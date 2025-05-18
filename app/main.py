@@ -120,7 +120,7 @@ if environment == "production":
         allow_headers=["*"],
     )
 
-@app.get("/health")
+@app.get("/health", tags=["Health"])
 def health_check():
     """check api health status."""
     

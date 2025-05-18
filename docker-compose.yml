@@ -59,8 +59,8 @@ services:
         # keep only the 7 most recent backups
         ls -t /backups/*.sql | tail -n +8 | xargs -r rm
         
-        # Sleep for 1 hours
-        sleep 60
+        # Sleep for 24 hours
+        sleep 86400
       done
       '
 
